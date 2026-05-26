@@ -8,6 +8,7 @@ import { orderBy } from 'firebase/firestore'
 import Header from '@/components/layout/Header'
 import { TableRowSkeleton } from '@/components/ui/skeleton'
 import { useFirestoreCollection } from '@/hooks/useFirestoreCollection'
+import { useShopSettings } from '@/contexts/ShopSettingsContext'
 import { formatCurrency, formatDate, toDate } from '@/lib/formatters'
 import { STATUS_COLORS } from '@/lib/constants'
 import { generateInvoicePDF } from '@/lib/pdf-utils'
@@ -25,6 +26,7 @@ const STATUS_FILTERS: { value: PaymentStatus | 'all'; label: string }[] = [
 
 export default function BillingPage() {
   const { data: invoices, loading } = useFirestoreCollection<Invoice>('invoices', [orderBy('createdAt', 'desc')])
+  const { name: shopName, tagline: shopTagline, phone: shopPhone, address: shopAddress } = useShopSettings()
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const debouncedSearch = useDebounce(search, 250)
@@ -105,17 +107,17 @@ export default function BillingPage() {
 
         {/* Table */}
         <div className="bg-card border border-border rounded-2xl overflow-hidden luxury-shadow">
-          <div className="overflow-x-auto">
-          <table className="w-full min-w-[580px]">
+          <div>
+          <table className="w-full table-fixed sm:table-auto">
             <thead>
               <tr className="border-b border-border bg-muted/50">
-                <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3">Invoice #</th>
-                <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3">Customer</th>
+                <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3 hidden sm:table-cell">Invoice #</th>
+                <th className="text-left text-xs font-medium text-muted-foreground px-3 sm:px-4 py-3">Customer</th>
                 <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3 hidden md:table-cell">Date</th>
                 <th className="text-right text-xs font-medium text-muted-foreground px-4 py-3 hidden sm:table-cell">Items</th>
-                <th className="text-right text-xs font-medium text-muted-foreground px-4 py-3">Total</th>
-                <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3">Status</th>
-                <th className="px-4 py-3" />
+                <th className="text-right text-xs font-medium text-muted-foreground px-3 sm:px-4 py-3">Total</th>
+                <th className="text-left text-xs font-medium text-muted-foreground px-2 sm:px-4 py-3">Status</th>
+                <th className="px-2 sm:px-4 py-3" />
               </tr>
             </thead>
             <tbody>
@@ -129,29 +131,31 @@ export default function BillingPage() {
                     transition={{ delay: i * 0.025 }}
                     className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
                   >
-                    <td className="px-4 py-3 text-sm font-mono font-medium text-foreground">{inv.invoiceNumber}</td>
-                    <td className="px-4 py-3">
-                      <div>
-                        <p className="text-sm font-medium text-foreground">{inv.customerName}</p>
-                        <p className="text-xs text-muted-foreground">{inv.customerPhone}</p>
+                    <td className="px-4 py-3 text-sm font-mono font-medium text-foreground hidden sm:table-cell">{inv.invoiceNumber}</td>
+                    <td className="px-3 sm:px-4 py-3 min-w-0">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">{inv.customerName}</p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          <span className="sm:hidden font-mono">{inv.invoiceNumber} · </span>{inv.customerPhone}
+                        </p>
                       </div>
                     </td>
                     <td className="px-4 py-3 text-sm text-muted-foreground hidden md:table-cell">
                       {inv.createdAt ? formatDate(toDate(inv.createdAt).toISOString()) : '—'}
                     </td>
                     <td className="px-4 py-3 text-right text-sm text-muted-foreground hidden sm:table-cell">{inv.items?.length ?? 0}</td>
-                    <td className="px-4 py-3 text-right text-sm font-semibold text-foreground">{formatCurrency(inv.total)}</td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 sm:px-4 py-3 text-right text-sm font-semibold text-foreground whitespace-nowrap">{formatCurrency(inv.total)}</td>
+                    <td className="px-2 sm:px-4 py-3">
                       <span className={cn('text-xs font-medium border px-2 py-0.5 rounded-md capitalize', STATUS_COLORS[inv.status])}>
                         {inv.status}
                       </span>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-2 sm:px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
                         <Link href={`/billing/${inv.id}`} className="p-1.5 text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted transition-colors">
                           <Eye size={14} />
                         </Link>
-                        <button onClick={() => generateInvoicePDF(inv)} className="p-1.5 text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted transition-colors">
+                        <button onClick={() => generateInvoicePDF(inv, { name: shopName, tagline: shopTagline, phone: shopPhone, address: shopAddress })} className="p-1.5 text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted transition-colors">
                           <Download size={14} />
                         </button>
                       </div>

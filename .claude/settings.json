@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node ./_gen-fonts.mjs)",
+      "Bash(npm remove *)",
+      "Read(//tmp/**)"
+    ]
+  }
+}

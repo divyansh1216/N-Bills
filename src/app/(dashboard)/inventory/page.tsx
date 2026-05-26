@@ -23,7 +23,7 @@ export default function InventoryPage() {
   const { data: items, loading } = useFirestoreCollection<InventoryItem>('inventory', [orderBy('createdAt', 'desc')])
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState<string>('all')
-  const [viewMode, setViewMode] = useState<ViewMode>('grid')
+  const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [modalOpen, setModalOpen] = useState(false)
   const [editItem, setEditItem] = useState<InventoryItem | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
@@ -145,11 +145,11 @@ export default function InventoryPage() {
         {/* List view */}
         {viewMode === 'list' && (
           <div className="bg-card border border-border rounded-2xl overflow-hidden luxury-shadow">
-            <div className="overflow-x-auto">
-            <table className="w-full min-w-[600px]">
+            <div>
+            <table className="w-full table-fixed sm:table-auto">
               <thead>
                 <tr className="border-b border-border bg-muted/50">
-                  <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3">Item</th>
+                  <th className="text-left text-xs font-medium text-muted-foreground px-3 sm:px-4 py-3">Item</th>
                   <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3 hidden sm:table-cell">Category</th>
                   <th className="text-right text-xs font-medium text-muted-foreground px-4 py-3">Price</th>
                   <th className="text-right text-xs font-medium text-muted-foreground px-4 py-3 hidden md:table-cell">Type</th>
@@ -176,24 +176,27 @@ export default function InventoryPage() {
                       transition={{ delay: i * 0.02 }}
                       className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
                     >
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
+                      <td className="px-3 sm:px-4 py-3">
+                        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
                           <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground shrink-0">
                             {item.name.slice(0, 2).toUpperCase()}
                           </div>
-                          <span className="text-sm font-medium text-foreground truncate max-w-[140px]">{item.name}</span>
+                          <div className="min-w-0">
+                            <span className="block text-sm font-medium text-foreground truncate">{item.name}</span>
+                            <span className="block text-xs text-muted-foreground capitalize truncate sm:hidden">{item.category}</span>
+                          </div>
                         </div>
                       </td>
                       <td className="px-4 py-3 hidden sm:table-cell">
                         <span className="text-xs px-2 py-0.5 bg-muted rounded-md text-muted-foreground capitalize">{item.category}</span>
                       </td>
-                      <td className="px-4 py-3 text-right text-sm font-medium text-foreground">
+                      <td className="px-3 sm:px-4 py-3 text-right text-sm font-medium text-foreground whitespace-nowrap">
                         {formatCurrency(item.isRentable ? (item.rentalPrice || 0) : item.price)}
                       </td>
                       <td className="px-4 py-3 text-right text-sm text-muted-foreground hidden md:table-cell">
                         {item.isRentable ? 'Rental' : 'Stitching'}
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-2 sm:px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <button onClick={() => handleEdit(item)} className="p-1.5 text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted transition-colors">
                             <motion.span whileHover={{ scale: 1.1 }} className="block">

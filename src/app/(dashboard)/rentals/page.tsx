@@ -82,17 +82,17 @@ export default function RentalsPage() {
 
         {/* Table */}
         <div className="bg-card border border-border rounded-2xl overflow-hidden luxury-shadow">
-          <div className="overflow-x-auto">
-          <table className="w-full min-w-[560px]">
+          <div>
+          <table className="w-full table-fixed sm:table-auto">
             <thead>
               <tr className="border-b border-border bg-muted/50">
-                <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3">Customer</th>
+                <th className="text-left text-xs font-medium text-muted-foreground px-3 sm:px-4 py-3">Customer</th>
                 <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3 hidden md:table-cell">Items</th>
                 <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3 hidden sm:table-cell">Rented</th>
-                <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3">Due / Returned</th>
+                <th className="text-left text-xs font-medium text-muted-foreground px-3 sm:px-4 py-3">Due / Returned</th>
                 <th className="text-right text-xs font-medium text-muted-foreground px-4 py-3 hidden lg:table-cell">Deposit</th>
-                <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3">Status</th>
-                {tab === 'active' && <th className="px-4 py-3" />}
+                <th className="text-left text-xs font-medium text-muted-foreground px-2 sm:px-4 py-3">Status</th>
+                {tab === 'active' && <th className="px-2 sm:px-4 py-3" />}
               </tr>
             </thead>
             <tbody>
@@ -108,10 +108,10 @@ export default function RentalsPage() {
                       transition={{ delay: i * 0.03 }}
                       className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
                     >
-                      <td className="px-4 py-3">
-                        <div>
-                          <p className="text-sm font-medium text-foreground">{rental.customerName}</p>
-                          <p className="text-xs text-muted-foreground">{rental.customerPhone}</p>
+                      <td className="px-3 sm:px-4 py-3 min-w-0">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-foreground truncate">{rental.customerName}</p>
+                          <p className="text-xs text-muted-foreground truncate">{rental.customerPhone}</p>
                         </div>
                       </td>
                       <td className="px-4 py-3 hidden md:table-cell">
@@ -123,10 +123,10 @@ export default function RentalsPage() {
                       <td className="px-4 py-3 text-sm text-muted-foreground hidden sm:table-cell">
                         {formatDate(rental.rentalDate)}
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-1.5">
+                      <td className="px-3 sm:px-4 py-3">
+                        <div className="flex items-center gap-1.5 min-w-0">
                           <Calendar size={12} className={cn('shrink-0', isOverdue ? 'text-red-500' : 'text-muted-foreground')} />
-                          <span className={cn('text-sm', isOverdue ? 'text-red-600 font-medium' : 'text-foreground')}>
+                          <span className={cn('text-sm truncate', isOverdue ? 'text-red-600 font-medium' : 'text-foreground')}>
                             {rental.returnedDate ? formatDate(rental.returnedDate) : formatDate(rental.returnDueDate)}
                           </span>
                         </div>
@@ -134,7 +134,7 @@ export default function RentalsPage() {
                       <td className="px-4 py-3 text-right text-sm text-foreground hidden lg:table-cell">
                         {formatCurrency(rental.depositPaid)}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-2 sm:px-4 py-3">
                         <span className={cn('text-xs font-medium border px-2 py-0.5 rounded-md capitalize',
                           isOverdue ? STATUS_COLORS.overdue : STATUS_COLORS[rental.status]
                         )}>
@@ -142,13 +142,13 @@ export default function RentalsPage() {
                         </span>
                       </td>
                       {tab === 'active' && (
-                        <td className="px-4 py-3">
+                        <td className="px-2 sm:px-4 py-3">
                           <button
                             onClick={() => setReturnModal(rental)}
-                            className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground px-2.5 py-1.5 rounded-lg hover:bg-muted transition-colors border border-border"
+                            className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground px-2 sm:px-2.5 py-1.5 rounded-lg hover:bg-muted transition-colors border border-border"
                           >
-                            <RefreshCw size={12} />
-                            Return
+                            <RefreshCw size={12} className="shrink-0" />
+                            <span className="hidden sm:inline">Return</span>
                           </button>
                         </td>
                       )}

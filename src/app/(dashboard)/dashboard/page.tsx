@@ -107,8 +107,8 @@ export default function DashboardPage() {
                 View all <ChevronRight size={13} />
               </Link>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[380px]">
+            <div>
+              <table className="w-full table-fixed sm:table-auto">
                 <thead>
                   <tr className="border-b border-border bg-muted/40">
                     <th className="text-left text-xs font-medium text-muted-foreground px-4 py-2.5">Customer</th>
@@ -136,15 +136,15 @@ export default function DashboardPage() {
                         transition={{ delay: i * 0.03 }}
                         className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
                       >
-                        <td className="px-4 py-3">
-                          <div>
-                            <p className="text-sm font-medium text-foreground truncate max-w-[130px]">{inv.customerName}</p>
-                            <p className="text-xs text-muted-foreground">{inv.createdAt ? formatDate(toDate(inv.createdAt).toISOString()) : '—'}</p>
+                        <td className="px-4 py-3 min-w-0">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-foreground truncate">{inv.customerName}</p>
+                            <p className="text-xs text-muted-foreground truncate">{inv.createdAt ? formatDate(toDate(inv.createdAt).toISOString()) : '—'}</p>
                           </div>
                         </td>
                         <td className="px-3 py-3 text-xs font-mono text-muted-foreground hidden sm:table-cell">{inv.invoiceNumber}</td>
-                        <td className="px-3 py-3 text-right text-sm font-semibold text-foreground">{formatCurrency(inv.total)}</td>
-                        <td className="px-3 py-3">
+                        <td className="px-3 py-3 text-right text-sm font-semibold text-foreground whitespace-nowrap">{formatCurrency(inv.total)}</td>
+                        <td className="px-2 sm:px-3 py-3">
                           <Link href={`/billing/${inv.id}`} className="flex items-center gap-1.5">
                             <span className={cn('text-xs font-medium border px-2 py-0.5 rounded-md capitalize', STATUS_COLORS[inv.status])}>
                               {inv.status}

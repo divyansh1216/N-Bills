@@ -74,11 +74,11 @@ export default function CustomersPage() {
 
         {/* Table */}
         <div className="bg-card border border-border rounded-2xl overflow-hidden luxury-shadow">
-          <div className="overflow-x-auto">
-          <table className="w-full min-w-[520px]">
+          <div>
+          <table className="w-full table-fixed sm:table-auto">
             <thead>
               <tr className="border-b border-border bg-muted/50">
-                <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3">Customer</th>
+                <th className="text-left text-xs font-medium text-muted-foreground px-3 sm:px-4 py-3">Customer</th>
                 <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3 hidden sm:table-cell">Phone</th>
                 <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3 hidden md:table-cell">Tier</th>
                 <th className="text-right text-xs font-medium text-muted-foreground px-4 py-3 hidden lg:table-cell">Orders</th>
@@ -98,12 +98,15 @@ export default function CustomersPage() {
                     transition={{ delay: i * 0.03 }}
                     className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
                   >
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
+                    <td className="px-3 sm:px-4 py-3">
+                      <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
                         <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-semibold text-foreground shrink-0">
                           {customer.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                         </div>
-                        <span className="text-sm font-medium text-foreground">{customer.name}</span>
+                        <div className="min-w-0">
+                          <span className="block text-sm font-medium text-foreground truncate">{customer.name}</span>
+                          <span className="block text-xs text-muted-foreground truncate sm:hidden">{customer.phone}</span>
+                        </div>
                       </div>
                     </td>
                     <td className="px-4 py-3 text-sm text-muted-foreground hidden sm:table-cell">{customer.phone}</td>
@@ -113,9 +116,9 @@ export default function CustomersPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right text-sm text-foreground hidden lg:table-cell">{customer.totalOrders}</td>
-                    <td className="px-4 py-3 text-right text-sm font-semibold text-foreground">{formatCurrency(customer.totalSpent)}</td>
+                    <td className="px-3 sm:px-4 py-3 text-right text-sm font-semibold text-foreground whitespace-nowrap">{formatCurrency(customer.totalSpent)}</td>
                     <td className="px-4 py-3 text-right text-sm text-muted-foreground hidden xl:table-cell">{formatDate(customer.lastVisit)}</td>
-                    <td className="px-4 py-3">
+                    <td className="px-2 sm:px-4 py-3 w-10">
                       <Link href={`/customers/${customer.id}`} className="p-1.5 text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted transition-colors flex items-center justify-center">
                         <ChevronRight size={16} />
                       </Link>

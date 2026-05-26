@@ -28,7 +28,7 @@ type Tab = 'orders' | 'measurements'
 export default function CustomerProfilePage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
-  const { name: shopName, tagline: shopTagline } = useShopSettings()
+  const { name: shopName, tagline: shopTagline, phone: shopPhone, address: shopAddress } = useShopSettings()
   const [customer, setCustomer] = useState<Customer | null>(null)
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [loading, setLoading] = useState(true)
@@ -348,15 +348,15 @@ export default function CustomerProfilePage() {
                       )}
                     </div>
 
-                    <div className="overflow-x-auto">
-                      <table className="w-full min-w-[480px]">
+                    <div>
+                      <table className="w-full">
                         <thead>
                           <tr className="border-b border-border bg-muted/50">
-                            <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3">Invoice</th>
+                            <th className="text-left text-xs font-medium text-muted-foreground px-3 sm:px-4 py-3">Invoice</th>
                             <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3 hidden sm:table-cell">Date</th>
-                            <th className="text-right text-xs font-medium text-muted-foreground px-4 py-3">Amount</th>
-                            <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3">Status</th>
-                            <th className="px-4 py-3" />
+                            <th className="text-right text-xs font-medium text-muted-foreground px-3 sm:px-4 py-3">Amount</th>
+                            <th className="text-left text-xs font-medium text-muted-foreground px-2 sm:px-4 py-3">Status</th>
+                            <th className="px-2 sm:px-4 py-3" />
                           </tr>
                         </thead>
                         <tbody>
@@ -370,11 +370,11 @@ export default function CustomerProfilePage() {
                                 transition={{ delay: i * 0.04 }}
                                 className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
                               >
-                                <td className="px-4 py-3 text-sm font-mono font-medium text-foreground">{inv.invoiceNumber}</td>
+                                <td className="px-3 sm:px-4 py-3 text-xs sm:text-sm font-mono font-medium text-foreground">{inv.invoiceNumber}</td>
                                 <td className="px-4 py-3 text-sm text-muted-foreground hidden sm:table-cell">
                                   {inv.createdAt ? formatDate(toDate(inv.createdAt).toISOString()) : '—'}
                                 </td>
-                                <td className="px-4 py-3 text-right text-sm font-semibold text-foreground">
+                                <td className="px-3 sm:px-4 py-3 text-right text-sm font-semibold text-foreground whitespace-nowrap">
                                   {formatCurrency(inv.total)}
                                 </td>
                                 <td className="px-4 py-3">
@@ -418,7 +418,7 @@ export default function CustomerProfilePage() {
                                 <td className="px-4 py-3">
                                   <div className="flex items-center gap-1 justify-end">
                                     <button
-                                      onClick={() => generateInvoicePDF(inv, { name: shopName, tagline: shopTagline })}
+                                      onClick={() => generateInvoicePDF(inv, { name: shopName, tagline: shopTagline, phone: shopPhone, address: shopAddress })}
                                       title="Download PDF"
                                       className="p-1.5 text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted transition-colors"
                                     >

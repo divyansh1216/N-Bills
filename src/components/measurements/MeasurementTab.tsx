@@ -31,7 +31,7 @@ function fmtDate(val: any): string {
 }
 
 export default function MeasurementTab({ customerId, customerName }: Props) {
-  const { name: shopName } = useShopSettings()
+  const { name: shopName, phone: shopPhone } = useShopSettings()
   const [measurements, setMeasurements] = useState<CustomerMeasurement[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -84,7 +84,7 @@ export default function MeasurementTab({ customerId, customerName }: Props) {
   async function handlePDF(m: CustomerMeasurement) {
     setPdfLoading(m.id)
     try {
-      await generateMeasurementPDF(m, shopName)
+      await generateMeasurementPDF(m, { name: shopName, phone: shopPhone })
     } catch {
       toast.error('Failed to generate PDF')
     } finally {

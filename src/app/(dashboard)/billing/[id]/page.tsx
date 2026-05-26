@@ -51,7 +51,7 @@ export default function InvoiceDetailPage() {
   const [editMode, setEditMode] = useState(false)
   const [saving, setSaving] = useState(false)
 
-  const { name: shopName, tagline: shopTagline, rentalEnabled } = useShopSettings()
+  const { name: shopName, tagline: shopTagline, phone: shopPhone, address: shopAddress, rentalEnabled } = useShopSettings()
 
   // Edit state
   const { data: inventory } = useFirestoreCollection<InventoryItem>('inventory')
@@ -514,27 +514,27 @@ export default function InvoiceDetailPage() {
                 </div>
 
                 {/* Items table */}
-                <div className="overflow-x-auto">
-                  <table className="w-full">
+                <div>
+                  <table className="w-full table-fixed sm:table-auto">
                     <thead>
                       <tr className="border-b border-border bg-foreground text-background">
-                        <th className="text-left text-xs font-medium px-6 py-3">Item</th>
+                        <th className="text-left text-xs font-medium px-3 sm:px-6 py-3">Item</th>
                         <th className="text-left text-xs font-medium px-4 py-3 hidden sm:table-cell">Type</th>
-                        <th className="text-right text-xs font-medium px-4 py-3">Qty</th>
-                        <th className="text-right text-xs font-medium px-4 py-3">Unit Price</th>
-                        <th className="text-right text-xs font-medium px-6 py-3">Amount</th>
+                        <th className="text-right text-xs font-medium px-2 sm:px-4 py-3 w-12">Qty</th>
+                        <th className="text-right text-xs font-medium px-3 sm:px-4 py-3 hidden sm:table-cell">Unit Price</th>
+                        <th className="text-right text-xs font-medium px-3 sm:px-6 py-3">Amount</th>
                       </tr>
                     </thead>
                     <tbody>
                       {invoice.items?.map((item, i) => (
                         <tr key={i} className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
-                          <td className="px-6 py-3 text-sm font-medium text-foreground">{item.name}</td>
+                          <td className="px-3 sm:px-6 py-3 text-sm font-medium text-foreground truncate">{item.name}</td>
                           <td className="px-4 py-3 text-sm text-muted-foreground capitalize hidden sm:table-cell">
                             {item.type === 'rental' ? `Rental (${item.rentalDays}d)` : 'Stitching'}
                           </td>
-                          <td className="px-4 py-3 text-right text-sm text-foreground">{item.quantity}</td>
-                          <td className="px-4 py-3 text-right text-sm text-foreground">{formatCurrency(item.unitPrice)}</td>
-                          <td className="px-6 py-3 text-right text-sm font-semibold text-foreground">{formatCurrency(item.amount)}</td>
+                          <td className="px-2 sm:px-4 py-3 text-right text-sm text-foreground">{item.quantity}</td>
+                          <td className="px-3 sm:px-4 py-3 text-right text-sm text-foreground hidden sm:table-cell">{formatCurrency(item.unitPrice)}</td>
+                          <td className="px-3 sm:px-6 py-3 text-right text-sm font-semibold text-foreground whitespace-nowrap">{formatCurrency(item.amount)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -592,7 +592,7 @@ export default function InvoiceDetailPage() {
                 <div className="px-8 pb-8 flex flex-wrap gap-3 border-t border-border pt-6">
                   <motion.button
                     whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-                    onClick={() => generateInvoicePDF(invoice, { name: shopName, tagline: shopTagline })}
+                    onClick={() => generateInvoicePDF(invoice, { name: shopName, tagline: shopTagline, phone: shopPhone, address: shopAddress })}
                     className="flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-medium hover:opacity-90 transition-opacity"
                   >
                     <Download size={15} />

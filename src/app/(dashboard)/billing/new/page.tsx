@@ -31,7 +31,7 @@ interface LineItemRow {
 
 export default function NewInvoicePage() {
   const router = useRouter()
-  const { name: shopName, tagline: shopTagline, rentalEnabled } = useShopSettings()
+  const { name: shopName, tagline: shopTagline, phone: shopPhone, address: shopAddress, rentalEnabled } = useShopSettings()
   const { data: customers } = useFirestoreCollection<Customer>('customers')
   const { data: inventory } = useFirestoreCollection<InventoryItem>('inventory')
 
@@ -181,7 +181,7 @@ export default function NewInvoicePage() {
 
       if (generatePDF) {
         setPdfLoading(true)
-        await generateInvoicePDF(finalInvoice, { name: shopName, tagline: shopTagline })
+        await generateInvoicePDF(finalInvoice, { name: shopName, tagline: shopTagline, phone: shopPhone, address: shopAddress })
         setPdfLoading(false)
       }
 
