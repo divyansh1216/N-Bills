@@ -1,6 +1,6 @@
 import { initializeApp, getApps } from 'firebase/app'
 import { getAuth } from 'firebase/auth'
-import { getFirestore } from 'firebase/firestore'
+import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore'
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -15,5 +15,19 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0
 
 export const auth = getAuth(app)
 export const db = getFirestore(app)
+
+// Enable offline persistence so bills/data work without internet
+// Only runs client-side; silently ignored if already enabled or unsupported
+if (typeof window !== 'undefined') {
+  enableIndexedDbPersistence(db).catch(err => {
+    if (err.code === 'failed-precondition') {
+      // Multiple tabs open — persistence only works in one tab at a time
+      console.warn('Firestore offline persistence unavailable: multiple tabs open')
+    } else if (err.code === 'unimplemented') {
+      // Browser doesn't support IndexedDB
+      console.warn('Firestore offline persistence not supported in this browser')
+    }
+  })
+}
 
 export default app
