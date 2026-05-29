@@ -19,7 +19,6 @@ import { formatCurrency } from '@/lib/formatters'
 import { useShopSettings } from '@/contexts/ShopSettingsContext'
 
 export default function InventoryPage() {
-  const { rentalEnabled } = useShopSettings()
   const { data: items, loading } = useFirestoreCollection<InventoryItem>('inventory', [orderBy('createdAt', 'desc')])
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState<string>('all')
@@ -59,20 +58,6 @@ export default function InventoryPage() {
     <div>
       <Header title="Inventory" />
       <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-6">
-
-        {/* Top stats */}
-        <div className={cn('grid gap-3', rentalEnabled ? 'grid-cols-2 sm:grid-cols-3' : 'grid-cols-2')}>
-          {[
-            { label: 'Total Items', value: items.length.toString() },
-            { label: 'Categories', value: new Set(items.map(i => i.category)).size.toString() },
-            ...(rentalEnabled ? [{ label: 'Rental Items', value: items.filter(i => i.isRentable).length.toString() }] : []),
-          ].map(stat => (
-            <div key={stat.label} className="bg-card border border-border rounded-xl p-4 luxury-shadow">
-              <p className="text-xs text-muted-foreground mb-1">{stat.label}</p>
-              <p className="text-xl font-bold text-foreground">{stat.value}</p>
-            </div>
-          ))}
-        </div>
 
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-3">

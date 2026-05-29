@@ -16,7 +16,7 @@ export default function Header({ title }: HeaderProps) {
 
   return (
     <>
-      <header className="sticky top-0 z-20 flex items-center gap-4 h-14 px-4 md:px-6 bg-background/95 backdrop-blur-sm border-b border-border">
+      <header className="sticky top-0 z-20 flex items-center gap-4 h-14 px-4 bg-background/95 backdrop-blur-sm border-b border-border">
         {/* Mobile menu */}
         <button
           onClick={() => setMobileOpen(true)}
