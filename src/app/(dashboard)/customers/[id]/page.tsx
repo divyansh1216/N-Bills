@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ArrowLeft, Download, Edit2, Check, X, Loader2,
-  Phone, Mail, MapPin, ExternalLink, ChevronDown, Ruler,
+  Phone, Mail, MapPin, ExternalLink, ChevronDown, Ruler, FileText,
 } from 'lucide-react'
 import { doc, getDoc, collection, query, where, getDocs, orderBy } from 'firebase/firestore'
 import { db } from '@/firebase/config'
@@ -36,7 +36,7 @@ export default function CustomerProfilePage() {
   const [editForm, setEditForm] = useState({ name: '', phone: '', email: '', address: '' })
   const [saving, setSaving] = useState(false)
   const [statusDropdown, setStatusDropdown] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<Tab>('orders')
+  const [activeTab, setActiveTab] = useState<Tab>('measurements')
 
   useEffect(() => {
     async function load() {
@@ -131,13 +131,24 @@ export default function CustomerProfilePage() {
       <Header title={loading ? 'Customer' : customer?.name || 'Customer'} />
       <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-6">
 
-        <button
-          onClick={() => router.back()}
-          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <ArrowLeft size={16} />
-          Back to customers
-        </button>
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => router.back()}
+            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ArrowLeft size={16} />
+            Back to customers
+          </button>
+          {customer && (
+            <Link
+              href={`/billing/new?customerId=${customer.id}`}
+              className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-xl text-sm font-medium hover:opacity-90 transition-opacity"
+            >
+              <FileText size={14} />
+              Create Invoice
+            </Link>
+          )}
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
@@ -295,6 +306,18 @@ export default function CustomerProfilePage() {
             {/* Tab nav */}
             <div className="flex gap-1 bg-muted/60 border border-border rounded-2xl p-1 mb-4">
               <button
+                onClick={() => setActiveTab('measurements')}
+                className={cn(
+                  'flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-sm font-medium transition-all',
+                  activeTab === 'measurements'
+                    ? 'bg-card text-foreground luxury-shadow'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                <Ruler size={14} />
+                Measurements
+              </button>
+              <button
                 onClick={() => setActiveTab('orders')}
                 className={cn(
                   'flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-sm font-medium transition-all',
@@ -310,18 +333,7 @@ export default function CustomerProfilePage() {
                   </span>
                 )}
               </button>
-              <button
-                onClick={() => setActiveTab('measurements')}
-                className={cn(
-                  'flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-sm font-medium transition-all',
-                  activeTab === 'measurements'
-                    ? 'bg-card text-foreground luxury-shadow'
-                    : 'text-muted-foreground hover:text-foreground'
-                )}
-              >
-                <Ruler size={14} />
-                Measurements
-              </button>
+             
             </div>
 
             <AnimatePresence mode="wait">

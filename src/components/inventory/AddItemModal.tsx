@@ -15,11 +15,12 @@ interface AddItemModalProps {
   open: boolean
   onClose: () => void
   editItem?: InventoryItem | null
+  onSaved?: (newItemId: string) => void
 }
 
 const EMPTY_FORM = {
   name: '',
-  category: 'lehenga' as InventoryItem['category'],
+  category: '' as InventoryItem['category'],
   price: '',
   rentalPrice: '',
   deposit: '',
@@ -27,7 +28,7 @@ const EMPTY_FORM = {
   isRentable: false,
 }
 
-export default function AddItemModal({ open, onClose, editItem }: AddItemModalProps) {
+export default function AddItemModal({ open, onClose, editItem, onSaved }: AddItemModalProps) {
   const { rentalEnabled } = useShopSettings()
   const [form, setForm] = useState(
     editItem
@@ -119,6 +120,9 @@ export default function AddItemModal({ open, onClose, editItem }: AddItemModalPr
           }
         }
         toast.success('Item added successfully')
+        onClose()
+        onSaved?.(docRef.id)
+        return
       }
       onClose()
     } catch (err: any) {
@@ -228,10 +232,12 @@ export default function AddItemModal({ open, onClose, editItem }: AddItemModalPr
               <div>
                 <label className="text-sm font-medium text-foreground mb-1.5 block">Category *</label>
                 <select
+                  required
                   value={form.category}
                   onChange={e => setForm(f => ({ ...f, category: e.target.value as InventoryItem['category'] }))}
                   className={inputClass}
                 >
+                  <option value="" disabled>Select category</option>
                   {CATEGORIES.filter(c => c.value !== 'all').map(c => (
                     <option key={c.value} value={c.value}>{c.label}</option>
                   ))}

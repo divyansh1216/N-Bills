@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Plus, LayoutGrid, List, Search, Filter } from 'lucide-react'
+import { Plus, LayoutGrid, List, Search, Filter, Edit2, Trash2 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 import { orderBy } from 'firebase/firestore'
@@ -184,12 +184,10 @@ export default function InventoryPage() {
                       <td className="px-2 sm:px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <button onClick={() => handleEdit(item)} className="p-1.5 text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted transition-colors">
-                            <motion.span whileHover={{ scale: 1.1 }} className="block">
-                              ✏️
-                            </motion.span>
+                            <Edit2 size={14} />
                           </button>
-                          <button onClick={() => setConfirmDelete(item.id)} className="p-1.5 text-muted-foreground hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors text-xs">
-                            🗑️
+                          <button onClick={() => setConfirmDelete(item.id)} className="p-1.5 text-muted-foreground hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors">
+                            <Trash2 size={14} />
                           </button>
                         </div>
                       </td>

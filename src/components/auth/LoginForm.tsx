@@ -1,40 +1,104 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Eye, EyeOff, Loader2, Phone, Mail } from 'lucide-react'
+import { Eye, EyeOff, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { signIn, signInWithGoogle, sendOtp, verifyOtp } from '@/firebase/auth'
+import { signInWithPinOnly, signUpWithPin, resetPin, getUserByPhone } from '@/firebase/auth'
 import { doc, getDoc } from 'firebase/firestore'
 import { db } from '@/firebase/config'
-import type { ConfirmationResult } from 'firebase/auth'
+import { useAuth } from '@/contexts/AuthContext'
 
-type Tab = 'email' | 'phone'
-type PhoneStep = 'number' | 'otp'
+type Mode = 'login' | 'signup' | 'forgot'
+// forgot flow: 'phone' → verify phone exists → 'new-pin'
+type ForgotStep = 'phone' | 'new-pin'
+
+function PhoneField({
+  label = 'Phone number', value, onChange,
+}: { label?: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="space-y-1.5">
+      <label className="text-sm font-medium text-foreground">{label}</label>
+      <div className="flex">
+        <span className="inline-flex items-center px-3 bg-muted border border-r-0 border-border rounded-l-xl text-sm text-muted-foreground">
+          +91
+        </span>
+        <input
+          type="tel"
+          value={value}
+          onChange={e => onChange(e.target.value.replace(/\D/g, ''))}
+          placeholder="98765 43210"
+          maxLength={10}
+          required
+          className="flex-1 px-4 py-3 bg-background border border-border rounded-r-xl text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+        />
+      </div>
+    </div>
+  )
+}
+
+function PinField({
+  value, onChange, show, onToggle, label, placeholder = '••••',
+}: {
+  value: string
+  onChange: (v: string) => void
+  show: boolean
+  onToggle: () => void
+  label: string
+  placeholder?: string
+}) {
+  return (
+    <div className="space-y-1.5">
+      <label className="text-sm font-medium text-foreground">{label}</label>
+      <div className="relative">
+        <input
+          type={show ? 'text' : 'password'}
+          inputMode="numeric"
+          value={value}
+          onChange={e => onChange(e.target.value.replace(/\D/g, ''))}
+          placeholder={placeholder}
+          maxLength={8}
+          required
+          className="w-full px-4 py-3 pr-12 bg-background border border-border rounded-xl text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring transition-all tracking-widest font-mono"
+        />
+        <button
+          type="button"
+          onClick={onToggle}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+        >
+          {show ? <EyeOff size={16} /> : <Eye size={16} />}
+        </button>
+      </div>
+    </div>
+  )
+}
 
 export default function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirect = searchParams.get('redirect') || '/dashboard'
+  const { setUser } = useAuth()
 
   const [shopName, setShopName] = useState('My Shop')
-  const [tab, setTab] = useState<Tab>('email')
+  const [mode, setMode] = useState<Mode>('login')
+  const [loading, setLoading] = useState(false)
 
-  // Email state
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
-  const [emailLoading, setEmailLoading] = useState(false)
-  const [googleLoading, setGoogleLoading] = useState(false)
-
-  // Phone state
+  // Shared fields
   const [phone, setPhone] = useState('')
-  const [otp, setOtp] = useState('')
-  const [phoneStep, setPhoneStep] = useState<PhoneStep>('number')
-  const [phoneLoading, setPhoneLoading] = useState(false)
-  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null)
-  const recaptchaContainerId = 'recaptcha-container'
+  const [pin, setPin] = useState('')
+  const [showPin, setShowPin] = useState(false)
+
+  // Signup extra
+  const [name, setName] = useState('')
+  const [confirmPin, setConfirmPin] = useState('')
+  const [showConfirmPin, setShowConfirmPin] = useState(false)
+
+  // Forgot flow
+  const [forgotStep, setForgotStep] = useState<ForgotStep>('phone')
+  const [forgotName, setForgotName] = useState('')
+  const [newPin, setNewPin] = useState('')
+  const [showNewPin, setShowNewPin] = useState(false)
 
   useEffect(() => {
     getDoc(doc(db, 'settings', 'shop'))
@@ -42,84 +106,107 @@ export default function LoginForm() {
       .catch(() => {})
   }, [])
 
-  function setSession() {
+  function setSession(user: { name: string; phone: string }) {
     document.cookie = 'nb-session=1; path=/; max-age=86400'
+    sessionStorage.setItem('nb-user', JSON.stringify(user))
   }
 
-  async function handleEmailLogin(e: React.FormEvent) {
+  function resetMode(m: Mode) {
+    setMode(m)
+    setPhone('')
+    setPin('')
+    setName('')
+    setConfirmPin('')
+    setForgotStep('phone')
+    setForgotName('')
+    setNewPin('')
+  }
+
+  // ── Login ──────────────────────────────────────────────────────────────────
+  async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
-    if (!email || !password) return
-    setEmailLoading(true)
+    if (!pin) return
+    setLoading(true)
     try {
-      await signIn(email, password)
-      setSession()
+      const user = await signInWithPinOnly(pin)
+      setSession(user)
+      setUser(user)
       router.replace(redirect)
     } catch (err: any) {
       toast.error(err.message || 'Sign in failed')
     } finally {
-      setEmailLoading(false)
+      setLoading(false)
     }
   }
 
-  async function handleGoogle() {
-    setGoogleLoading(true)
+  // ── Sign up ────────────────────────────────────────────────────────────────
+  async function handleSignup(e: React.FormEvent) {
+    e.preventDefault()
+    if (!name.trim() || !phone || !pin) return
+    if (pin !== confirmPin) {
+      toast.error('PINs do not match')
+      return
+    }
+    if (pin.length < 4) {
+      toast.error('PIN must be at least 4 digits')
+      return
+    }
+    setLoading(true)
     try {
-      await signInWithGoogle()
-      setSession()
+      const user = await signUpWithPin(name.trim(), phone, pin)
+      setSession(user)
+      setUser(user)
       router.replace(redirect)
     } catch (err: any) {
-      toast.error(err.message || 'Google sign in failed')
+      toast.error(err.message || 'Sign up failed')
     } finally {
-      setGoogleLoading(false)
+      setLoading(false)
     }
   }
 
-  async function handleSendOtp(e: React.FormEvent) {
+  // ── Forgot PIN — step 1: verify phone ──────────────────────────────────────
+  async function handleForgotPhone(e: React.FormEvent) {
     e.preventDefault()
-    const trimmed = phone.trim()
-    if (!trimmed) return
-    // Ensure E.164 format — prepend +91 if user omits country code
-    const formatted = trimmed.startsWith('+') ? trimmed : `+91${trimmed}`
-    setPhoneLoading(true)
+    if (!phone) return
+    setLoading(true)
     try {
-      const result = await sendOtp(formatted, recaptchaContainerId)
-      setConfirmationResult(result)
-      setPhoneStep('otp')
-      toast.success('OTP sent successfully')
+      const user = await getUserByPhone(phone)
+      if (!user) {
+        toast.error('No account found with this phone number.')
+        return
+      }
+      setForgotName(user.name)
+      setForgotStep('new-pin')
     } catch (err: any) {
-      toast.error(err.message || 'Failed to send OTP')
+      toast.error(err.message || 'Something went wrong')
     } finally {
-      setPhoneLoading(false)
+      setLoading(false)
     }
   }
 
-  async function handleVerifyOtp(e: React.FormEvent) {
+  // ── Forgot PIN — step 2: set new PIN ──────────────────────────────────────
+  async function handleResetPin(e: React.FormEvent) {
     e.preventDefault()
-    if (!confirmationResult || !otp.trim()) return
-    setPhoneLoading(true)
+    if (newPin.length < 4) {
+      toast.error('PIN must be at least 4 digits')
+      return
+    }
+    setLoading(true)
     try {
-      await verifyOtp(confirmationResult, otp.trim())
-      setSession()
+      const user = await resetPin(phone, newPin)
+      toast.success('PIN updated! Signing you in…')
+      setSession(user)
+      setUser(user)
       router.replace(redirect)
     } catch (err: any) {
-      toast.error(err.message || 'Invalid OTP. Please try again.')
+      toast.error(err.message || 'Failed to reset PIN')
     } finally {
-      setPhoneLoading(false)
+      setLoading(false)
     }
-  }
-
-  function resetPhone() {
-    setPhone('')
-    setOtp('')
-    setPhoneStep('number')
-    setConfirmationResult(null)
   }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      {/* Invisible reCAPTCHA mount point */}
-      <div id={recaptchaContainerId} />
-
       <motion.div
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
@@ -129,227 +216,219 @@ export default function LoginForm() {
         {/* Logo */}
         <div className="text-center mb-10">
           <h1 className="text-4xl font-bold tracking-[0.15em] text-foreground mb-2 uppercase">{shopName}</h1>
-          <p className="text-muted-foreground text-sm tracking-widest uppercase">
-            Boutique Management
-          </p>
+          <p className="text-muted-foreground text-sm tracking-widest uppercase">Boutique Management</p>
         </div>
 
-        {/* Card */}
         <div className="bg-card border border-border rounded-2xl p-8 luxury-shadow-lg">
-          <h2 className="text-xl font-semibold text-foreground mb-1">Welcome back</h2>
-          <p className="text-muted-foreground text-sm mb-6">Sign in to your account to continue</p>
-
-          {/* Tabs */}
-          <div className="flex gap-1 bg-muted rounded-xl p-1 mb-6">
-            <button
-              type="button"
-              onClick={() => setTab('email')}
-              className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-all ${
-                tab === 'email'
-                  ? 'bg-card text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              <Mail size={14} />
-              Email
-            </button>
-            <button
-              type="button"
-              onClick={() => { setTab('phone'); resetPhone() }}
-              className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-all ${
-                tab === 'phone'
-                  ? 'bg-card text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              <Phone size={14} />
-              Phone
-            </button>
-          </div>
-
           <AnimatePresence mode="wait">
-            {tab === 'email' ? (
+
+            {/* ── LOGIN ── */}
+            {mode === 'login' && (
               <motion.div
-                key="email"
+                key="login"
                 initial={{ opacity: 0, x: -8 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 8 }}
                 transition={{ duration: 0.2 }}
               >
-                <form onSubmit={handleEmailLogin} className="space-y-5">
+                <h2 className="text-xl font-semibold text-foreground mb-1">Welcome back</h2>
+                <p className="text-muted-foreground text-sm mb-6">Enter your PIN to sign in</p>
+
+                <form onSubmit={handleLogin} className="space-y-5">
+                  <PinField
+                    label="Secret PIN"
+                    value={pin}
+                    onChange={setPin}
+                    show={showPin}
+                    onToggle={() => setShowPin(v => !v)}
+                  />
+
+                  <motion.button
+                    type="submit"
+                    disabled={loading || pin.length < 4}
+                    whileHover={{ scale: 1.01 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="w-full py-3 bg-primary text-primary-foreground rounded-xl font-medium text-sm flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-60"
+                  >
+                    {loading && <Loader2 size={16} className="animate-spin" />}
+                    Sign in
+                  </motion.button>
+                </form>
+
+                <div className="flex justify-between mt-6 text-xs text-muted-foreground">
+                  <button
+                    type="button"
+                    onClick={() => resetMode('forgot')}
+                    className="hover:text-foreground transition-colors"
+                  >
+                    Forgot PIN?
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => resetMode('signup')}
+                    className="hover:text-foreground transition-colors"
+                  >
+                    Create account
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
+            {/* ── SIGN UP ── */}
+            {mode === 'signup' && (
+              <motion.div
+                key="signup"
+                initial={{ opacity: 0, x: 8 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -8 }}
+                transition={{ duration: 0.2 }}
+              >
+                <h2 className="text-xl font-semibold text-foreground mb-1">Create account</h2>
+                <p className="text-muted-foreground text-sm mb-6">Enter your details to get started</p>
+
+                <form onSubmit={handleSignup} className="space-y-5">
                   <div className="space-y-1.5">
-                    <label className="text-sm font-medium text-foreground">Email address</label>
+                    <label className="text-sm font-medium text-foreground">Your name</label>
                     <input
-                      type="email"
-                      value={email}
-                      onChange={e => setEmail(e.target.value)}
-                      placeholder="you@example.com"
+                      type="text"
+                      value={name}
+                      onChange={e => setName(e.target.value)}
+                      placeholder="e.g. Rahul Sharma"
                       required
                       className="w-full px-4 py-3 bg-background border border-border rounded-xl text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring transition-all"
                     />
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium text-foreground">Password</label>
-                    <div className="relative">
-                      <input
-                        type={showPassword ? 'text' : 'password'}
-                        value={password}
-                        onChange={e => setPassword(e.target.value)}
-                        placeholder="••••••••"
-                        required
-                        className="w-full px-4 py-3 pr-12 bg-background border border-border rounded-xl text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring transition-all"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(v => !v)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                      >
-                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                      </button>
-                    </div>
-                  </div>
+                  <PhoneField label="Phone number" value={phone} onChange={setPhone} />
+
+                  <PinField
+                    label="Set a secret PIN"
+                    value={pin}
+                    onChange={setPin}
+                    show={showPin}
+                    onToggle={() => setShowPin(v => !v)}
+                    placeholder="4–8 digits"
+                  />
+
+                  <PinField
+                    label="Confirm PIN"
+                    value={confirmPin}
+                    onChange={setConfirmPin}
+                    show={showConfirmPin}
+                    onToggle={() => setShowConfirmPin(v => !v)}
+                    placeholder="repeat PIN"
+                  />
 
                   <motion.button
                     type="submit"
-                    disabled={emailLoading}
+                    disabled={loading || !name.trim() || phone.length < 10 || pin.length < 4}
                     whileHover={{ scale: 1.01 }}
                     whileTap={{ scale: 0.98 }}
                     className="w-full py-3 bg-primary text-primary-foreground rounded-xl font-medium text-sm flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-60"
                   >
-                    {emailLoading && <Loader2 size={16} className="animate-spin" />}
-                    Sign in
+                    {loading && <Loader2 size={16} className="animate-spin" />}
+                    Create account
                   </motion.button>
                 </form>
 
-                <div className="flex items-center gap-4 my-6">
-                  <div className="flex-1 h-px bg-border" />
-                  <span className="text-muted-foreground text-xs">or</span>
-                  <div className="flex-1 h-px bg-border" />
+                <div className="mt-6 text-center">
+                  <button
+                    type="button"
+                    onClick={() => resetMode('login')}
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Already have an account? Sign in
+                  </button>
                 </div>
-
-                <motion.button
-                  onClick={handleGoogle}
-                  disabled={googleLoading}
-                  whileHover={{ scale: 1.01 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="w-full py-3 bg-background border border-border rounded-xl font-medium text-sm flex items-center justify-center gap-3 hover:bg-muted transition-colors disabled:opacity-60"
-                >
-                  {googleLoading ? (
-                    <Loader2 size={16} className="animate-spin" />
-                  ) : (
-                    <svg width="16" height="16" viewBox="0 0 24 24">
-                      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                    </svg>
-                  )}
-                  Continue with Google
-                </motion.button>
               </motion.div>
-            ) : (
+            )}
+
+            {/* ── FORGOT PIN ── */}
+            {mode === 'forgot' && (
               <motion.div
-                key="phone"
+                key="forgot"
                 initial={{ opacity: 0, x: 8 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -8 }}
                 transition={{ duration: 0.2 }}
               >
                 <AnimatePresence mode="wait">
-                  {phoneStep === 'number' ? (
-                    <motion.form
-                      key="phone-input"
+                  {forgotStep === 'phone' ? (
+                    <motion.div
+                      key="forgot-phone"
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
                       transition={{ duration: 0.15 }}
-                      onSubmit={handleSendOtp}
-                      className="space-y-5"
                     >
-                      <div className="space-y-1.5">
-                        <label className="text-sm font-medium text-foreground">Phone number</label>
-                        <div className="flex">
-                          <span className="inline-flex items-center px-3 bg-muted border border-r-0 border-border rounded-l-xl text-sm text-muted-foreground">
-                            +91
-                          </span>
-                          <input
-                            type="tel"
-                            value={phone}
-                            onChange={e => setPhone(e.target.value.replace(/\D/g, ''))}
-                            placeholder="98765 43210"
-                            maxLength={10}
-                            required
-                            className="flex-1 px-4 py-3 bg-background border border-border rounded-r-xl text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring transition-all"
-                          />
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          Enter your 10-digit mobile number. An OTP will be sent via SMS.
-                        </p>
-                      </div>
+                      <h2 className="text-xl font-semibold text-foreground mb-1">Reset PIN</h2>
+                      <p className="text-muted-foreground text-sm mb-6">Enter your phone number to continue</p>
 
-                      <motion.button
-                        type="submit"
-                        disabled={phoneLoading || phone.length < 10}
-                        whileHover={{ scale: 1.01 }}
-                        whileTap={{ scale: 0.98 }}
-                        className="w-full py-3 bg-primary text-primary-foreground rounded-xl font-medium text-sm flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-60"
-                      >
-                        {phoneLoading && <Loader2 size={16} className="animate-spin" />}
-                        Send OTP
-                      </motion.button>
-                    </motion.form>
+                      <form onSubmit={handleForgotPhone} className="space-y-5">
+                        <PhoneField label="Registered phone number" value={phone} onChange={setPhone} />
+
+                        <motion.button
+                          type="submit"
+                          disabled={loading || phone.length < 10}
+                          whileHover={{ scale: 1.01 }}
+                          whileTap={{ scale: 0.98 }}
+                          className="w-full py-3 bg-primary text-primary-foreground rounded-xl font-medium text-sm flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-60"
+                        >
+                          {loading && <Loader2 size={16} className="animate-spin" />}
+                          Continue
+                        </motion.button>
+                      </form>
+                    </motion.div>
                   ) : (
-                    <motion.form
-                      key="otp-input"
+                    <motion.div
+                      key="forgot-newpin"
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
                       transition={{ duration: 0.15 }}
-                      onSubmit={handleVerifyOtp}
-                      className="space-y-5"
                     >
-                      <div className="space-y-1.5">
-                        <label className="text-sm font-medium text-foreground">Enter OTP</label>
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          value={otp}
-                          onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
-                          placeholder="• • • • • •"
-                          maxLength={6}
-                          required
-                          autoFocus
-                          className="w-full px-4 py-3 bg-background border border-border rounded-xl text-foreground placeholder:text-muted-foreground text-sm text-center tracking-[0.5em] font-mono focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+                      <h2 className="text-xl font-semibold text-foreground mb-1">Set new PIN</h2>
+                      <p className="text-muted-foreground text-sm mb-6">
+                        Hi <span className="text-foreground font-medium">{forgotName}</span>, choose a new PIN
+                      </p>
+
+                      <form onSubmit={handleResetPin} className="space-y-5">
+                        <PinField
+                          label="New PIN"
+                          value={newPin}
+                          onChange={setNewPin}
+                          show={showNewPin}
+                          onToggle={() => setShowNewPin(v => !v)}
+                          placeholder="4–8 digits"
                         />
-                        <p className="text-xs text-muted-foreground">
-                          OTP sent to +91 {phone}
-                        </p>
-                      </div>
 
-                      <motion.button
-                        type="submit"
-                        disabled={phoneLoading || otp.length < 6}
-                        whileHover={{ scale: 1.01 }}
-                        whileTap={{ scale: 0.98 }}
-                        className="w-full py-3 bg-primary text-primary-foreground rounded-xl font-medium text-sm flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-60"
-                      >
-                        {phoneLoading && <Loader2 size={16} className="animate-spin" />}
-                        Verify &amp; Sign in
-                      </motion.button>
-
-                      <button
-                        type="button"
-                        onClick={resetPhone}
-                        className="w-full text-center text-xs text-muted-foreground hover:text-foreground transition-colors"
-                      >
-                        Change phone number
-                      </button>
-                    </motion.form>
+                        <motion.button
+                          type="submit"
+                          disabled={loading || newPin.length < 4}
+                          whileHover={{ scale: 1.01 }}
+                          whileTap={{ scale: 0.98 }}
+                          className="w-full py-3 bg-primary text-primary-foreground rounded-xl font-medium text-sm flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-60"
+                        >
+                          {loading && <Loader2 size={16} className="animate-spin" />}
+                          Save PIN &amp; Sign in
+                        </motion.button>
+                      </form>
+                    </motion.div>
                   )}
                 </AnimatePresence>
+
+                <div className="mt-6 text-center">
+                  <button
+                    type="button"
+                    onClick={() => resetMode('login')}
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Back to sign in
+                  </button>
+                </div>
               </motion.div>
             )}
+
           </AnimatePresence>
         </div>
 

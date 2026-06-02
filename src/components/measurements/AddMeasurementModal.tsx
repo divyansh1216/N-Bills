@@ -2,12 +2,12 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Loader2, Image as ImageIcon, Plus, Trash2 } from 'lucide-react'
+import { X, Loader2, Image as ImageIcon, Plus, Trash2, Camera } from 'lucide-react'
 import { toast } from 'sonner'
 import { addMeasurement, updateMeasurement } from '@/firebase/firestore'
 import { uploadMeasurementImage } from '@/lib/cloudinary'
 import { GARMENT_FIELDS, GARMENT_LABELS, GARMENT_TYPES, GARMENT_COLORS } from '@/lib/measurement-config'
-import type { CustomerMeasurement, GarmentType, GarmentMeasurements, MeasurementUnit } from '@/types'
+import type { CustomerMeasurement, GarmentType, GarmentMeasurements } from '@/types'
 import { cn } from '@/lib/utils'
 
 interface Props {
@@ -37,9 +37,10 @@ function emptyFields(): FieldValues {
 export default function AddMeasurementModal({ open, onClose, customerId, customerName, editItem, onSaved }: Props) {
   const [label, setLabel] = useState('')
   const [garmentType, setGarmentType] = useState<GarmentType>('blouse')
-  const [unit, setUnit] = useState<MeasurementUnit>('in')
+  const unit = 'in' as const
   const [fieldValues, setFieldValues] = useState<FieldValues>(emptyFields())
   const [notes, setNotes] = useState('')
+  const [dueDate, setDueDate] = useState('')
   const [patternFile, setPatternFile] = useState<File | null>(null)
   const [patternPreview, setPatternPreview] = useState('')
   const [designFiles, setDesignFiles] = useState<File[]>([])
@@ -48,24 +49,27 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
   const [uploadProgress, setUploadProgress] = useState(0)
 
   const patternRef = useRef<HTMLInputElement>(null)
+  const patternCameraRef = useRef<HTMLInputElement>(null)
   const designRef = useRef<HTMLInputElement>(null)
+  const designCameraRef = useRef<HTMLInputElement>(null)
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
 
   useEffect(() => {
     if (!open) return
     if (editItem) {
       setLabel(editItem.label)
       setGarmentType(editItem.garmentType)
-      setUnit(editItem.unit)
       setFieldValues(toFieldValues(editItem.measurements))
       setNotes(editItem.measurements.notes || '')
+      setDueDate(editItem.dueDate || '')
       setPatternPreview(editItem.measurements.patternImageUrl || '')
       setDesignPreviews(editItem.measurements.designImageUrls || [])
     } else {
       setLabel('')
       setGarmentType('blouse')
-      setUnit('in')
       setFieldValues(emptyFields())
       setNotes('')
+      setDueDate('')
       setPatternPreview('')
       setDesignPreviews([])
     }
@@ -97,6 +101,7 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!label.trim()) { toast.error('Enter a label for this measurement'); return }
+    if (!dueDate) { toast.error('Select a due date'); return }
 
     setLoading(true)
     setUploadProgress(0)
@@ -135,6 +140,7 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
           garmentType,
           unit,
           measurements,
+          ...(dueDate ? { dueDate } : {}),
         })
         docId = ref.id
       }
@@ -171,6 +177,7 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
         garmentType,
         unit,
         measurements,
+        ...(dueDate ? { dueDate } : { dueDate: '' }),
       })
 
       if (!isNew) {
@@ -181,6 +188,7 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
           garmentType,
           unit,
           measurements,
+          dueDate: dueDate || undefined,
           updatedAt: new Date().toISOString(),
         }
         toast.success('Measurements updated')
@@ -194,6 +202,7 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
           garmentType,
           unit,
           measurements,
+          dueDate: dueDate || undefined,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         }
@@ -245,7 +254,7 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
             </div>
 
             <form onSubmit={handleSubmit} className="p-6 space-y-6">
-              {/* Label + Unit row */}
+              {/* Label + Due Date row */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Label *</label>
@@ -258,24 +267,14 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Unit</label>
-                  <div className="flex gap-1">
-                    {(['in', 'cm'] as const).map(u => (
-                      <button
-                        key={u}
-                        type="button"
-                        onClick={() => setUnit(u)}
-                        className={cn(
-                          'flex-1 py-2 rounded-xl text-sm font-medium transition-colors border',
-                          unit === u
-                            ? 'bg-foreground text-background border-foreground'
-                            : 'bg-background border-border text-muted-foreground hover:text-foreground'
-                        )}
-                      >
-                        {u === 'in' ? 'Inches' : 'CM'}
-                      </button>
-                    ))}
-                  </div>
+                  <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Due Date *</label>
+                  <input
+                    type="date"
+                    value={dueDate}
+                    onChange={e => setDueDate(e.target.value)}
+                    required
+                    className={inputClass}
+                  />
                 </div>
               </div>
 
@@ -307,7 +306,7 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
                   <label className="text-xs font-medium text-muted-foreground">
                     {GARMENT_LABELS[garmentType]} Measurements
                   </label>
-                  <span className="text-xs text-muted-foreground">{unit === 'in' ? 'inches' : 'centimetres'}</span>
+                  <span className="text-xs text-muted-foreground">inches</span>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {fields.filter(f => f.type === 'number').map(field => (
@@ -317,7 +316,7 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
                         <input
                           type="number"
                           min={0}
-                          step={0.5}
+                          step="any"
                           value={fieldValues[field.key] ?? ''}
                           onChange={e => setFieldValues(prev => ({ ...prev, [field.key]: e.target.value }))}
                           placeholder={field.placeholder}
@@ -348,7 +347,7 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
 
               {/* Notes */}
               <div>
-                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Special Stitching Notes</label>
+                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Stitching Notes (Blouse Color , Blouse Piece , Pattern Name) </label>
                 <textarea
                   value={notes}
                   onChange={e => setNotes(e.target.value)}
@@ -362,27 +361,46 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
               {garmentType === 'blouse' && (
                 <div>
                   <label className="text-xs font-medium text-muted-foreground mb-2 block">Blouse Pattern</label>
-                  <div
-                    onClick={() => patternRef.current?.click()}
-                    className={cn(
-                      'h-28 border-2 border-dashed border-border rounded-xl cursor-pointer hover:border-foreground/30 transition-colors flex items-center justify-center overflow-hidden',
-                      patternPreview ? 'p-0' : 'gap-2 flex-col'
-                    )}
-                  >
-                    {patternPreview ? (
-                      <div className="relative w-full h-full group">
-                        <img src={patternPreview} alt="Pattern" className="w-full h-full object-cover" />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                          <p className="text-white text-xs font-medium">Click to change</p>
-                        </div>
+                  {patternPreview ? (
+                    <div className="relative h-28 rounded-xl overflow-hidden border border-border group">
+                      <img
+                        src={patternPreview}
+                        alt="Pattern"
+                        className="w-full h-full object-cover cursor-pointer"
+                        onClick={() => setLightboxSrc(patternPreview)}
+                      />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3 pointer-events-none">
+                        <p className="text-white text-xs font-medium">Tap to view</p>
                       </div>
-                    ) : (
-                      <>
-                        <ImageIcon size={20} className="text-muted-foreground" />
-                        <p className="text-xs text-muted-foreground">Upload blouse pattern</p>
-                      </>
-                    )}
-                  </div>
+                      <button
+                        type="button"
+                        onClick={() => { setPatternFile(null); setPatternPreview('') }}
+                        className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/60 rounded-full flex items-center justify-center text-white"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => patternCameraRef.current?.click()}
+                        className="flex-1 h-16 border-2 border-dashed border-border rounded-xl hover:border-foreground/30 transition-colors flex flex-col items-center justify-center gap-1"
+                      >
+                        <Camera size={16} className="text-muted-foreground" />
+                        <span className="text-xs text-muted-foreground">Camera</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => patternRef.current?.click()}
+                        className="flex-1 h-16 border-2 border-dashed border-border rounded-xl hover:border-foreground/30 transition-colors flex flex-col items-center justify-center gap-1"
+                      >
+                        <ImageIcon size={16} className="text-muted-foreground" />
+                        <span className="text-xs text-muted-foreground">Gallery</span>
+                      </button>
+                    </div>
+                  )}
+                  <input ref={patternCameraRef} type="file" accept="image/*" capture="environment" onChange={handlePatternChange} className="hidden" />
                   <input ref={patternRef} type="file" accept="image/*" onChange={handlePatternChange} className="hidden" />
                 </div>
               )}
@@ -396,7 +414,12 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
                 <div className="grid grid-cols-4 gap-2">
                   {designPreviews.map((src, i) => (
                     <div key={i} className="relative aspect-square rounded-xl overflow-hidden border border-border group">
-                      <img src={src} alt={`Design ${i + 1}`} className="w-full h-full object-cover" />
+                      <img
+                        src={src}
+                        alt={`Design ${i + 1}`}
+                        className="w-full h-full object-cover cursor-pointer"
+                        onClick={() => setLightboxSrc(src)}
+                      />
                       <button
                         type="button"
                         onClick={() => removeDesign(i)}
@@ -409,13 +432,25 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
                   {designPreviews.length < 4 && (
                     <button
                       type="button"
-                      onClick={() => designRef.current?.click()}
-                      className="aspect-square rounded-xl border-2 border-dashed border-border hover:border-foreground/30 flex items-center justify-center transition-colors"
+                      onClick={() => designCameraRef.current?.click()}
+                      className="aspect-square rounded-xl border-2 border-dashed border-border hover:border-foreground/30 flex flex-col items-center justify-center gap-1 transition-colors"
                     >
-                      <Plus size={16} className="text-muted-foreground" />
+                      <Camera size={14} className="text-muted-foreground" />
+                      <span className="text-[10px] text-muted-foreground">Camera</span>
+                    </button>
+                  )}
+                  {designPreviews.length < 4 && (
+                    <button
+                      type="button"
+                      onClick={() => designRef.current?.click()}
+                      className="aspect-square rounded-xl border-2 border-dashed border-border hover:border-foreground/30 flex flex-col items-center justify-center gap-1 transition-colors"
+                    >
+                      <Plus size={14} className="text-muted-foreground" />
+                      <span className="text-[10px] text-muted-foreground">Gallery</span>
                     </button>
                   )}
                 </div>
+                <input ref={designCameraRef} type="file" accept="image/*" capture="environment" onChange={handleDesignChange} className="hidden" />
                 <input ref={designRef} type="file" accept="image/*" multiple onChange={handleDesignChange} className="hidden" />
               </div>
 
@@ -459,6 +494,34 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
           </motion.div>
         </div>
       )}
+      {/* Lightbox */}
+      <AnimatePresence>
+        {lightboxSrc && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90"
+            onClick={() => setLightboxSrc(null)}
+          >
+            <button
+              className="absolute top-4 right-4 w-8 h-8 bg-white/10 rounded-full flex items-center justify-center text-white hover:bg-white/20 transition-colors"
+              onClick={() => setLightboxSrc(null)}
+            >
+              <X size={16} />
+            </button>
+            <motion.img
+              initial={{ scale: 0.92, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.92, opacity: 0 }}
+              src={lightboxSrc}
+              alt="Preview"
+              className="max-w-full max-h-full object-contain rounded-xl"
+              onClick={e => e.stopPropagation()}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </AnimatePresence>
   )
 }

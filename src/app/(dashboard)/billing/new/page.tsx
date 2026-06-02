@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useMemo } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useMemo, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, Trash2, ArrowLeft, Loader2, FileText, Ruler } from 'lucide-react'
 import { toast } from 'sonner'
@@ -14,6 +14,7 @@ import { formatCurrency, generateInvoiceNumber } from '@/lib/formatters'
 import { generateInvoicePDF } from '@/lib/pdf-utils'
 import { useFirestoreCollection } from '@/hooks/useFirestoreCollection'
 import LoadMeasurementsModal from '@/components/measurements/LoadMeasurementsModal'
+import AddItemModal from '@/components/inventory/AddItemModal'
 import type { Customer, InventoryItem, InvoiceLineItem, Invoice } from '@/types'
 import { cn } from '@/lib/utils'
 
@@ -31,6 +32,7 @@ interface LineItemRow {
 
 export default function NewInvoicePage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { name: shopName, tagline: shopTagline, phone: shopPhone, address: shopAddress, rentalEnabled } = useShopSettings()
   const { data: customers } = useFirestoreCollection<Customer>('customers')
   const { data: inventory } = useFirestoreCollection<InventoryItem>('inventory')
@@ -49,8 +51,18 @@ export default function NewInvoicePage() {
   const [loading, setLoading] = useState(false)
   const [pdfLoading, setPdfLoading] = useState(false)
   const [measurementsModalOpen, setMeasurementsModalOpen] = useState(false)
+  const [addItemModalOpen, setAddItemModalOpen] = useState(false)
+  const [addItemTargetLineId, setAddItemTargetLineId] = useState<string | null>(null)
 
   const selectedCustomer = customers.find(c => c.id === customerId)
+
+  useEffect(() => {
+    const preselect = searchParams.get('customerId')
+    if (preselect && customers.length > 0 && !customerId) {
+      const match = customers.find(c => c.id === preselect)
+      if (match) setCustomerId(match.id)
+    }
+  }, [customers, searchParams])
 
   const filteredCustomers = useMemo(() =>
     customers.filter(c =>
@@ -279,18 +291,26 @@ export default function NewInvoicePage() {
                     exit={{ opacity: 0, x: -12 }}
                     className="flex flex-col sm:grid sm:grid-cols-12 gap-2 items-start"
                   >
-                    {/* Item select */}
-                    <div className="w-full sm:col-span-4">
+                    {/* Item select + add new */}
+                    <div className="w-full sm:col-span-4 flex gap-1.5">
                       <select
                         value={item.itemId}
                         onChange={e => updateLineItem(item.id, 'itemId', e.target.value)}
-                        className={cn(inputClass, 'w-full')}
+                        className={cn(inputClass, 'flex-1 min-w-0')}
                       >
                         <option value="">Select item</option>
                         {inventory.map(inv => (
                           <option key={inv.id} value={inv.id}>{inv.name}</option>
                         ))}
                       </select>
+                      <button
+                        type="button"
+                        title="Add new inventory item"
+                        onClick={() => { setAddItemTargetLineId(item.id); setAddItemModalOpen(true) }}
+                        className="shrink-0 p-2 border border-border rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                      >
+                        <Plus size={14} />
+                      </button>
                     </div>
 
                     {/* Type + Qty row on mobile */}
@@ -327,7 +347,7 @@ export default function NewInvoicePage() {
                         <input
                           type="number"
                           min={0}
-                          value={item.unitPrice}
+                          value={item.unitPrice || ''}
                           onChange={e => updateLineItem(item.id, 'unitPrice', Number(e.target.value))}
                           placeholder="Price"
                           className={cn(inputClass, 'w-full')}
@@ -421,8 +441,9 @@ export default function NewInvoicePage() {
                   type="number"
                   min={0}
                   max={subtotal}
-                  value={discount}
+                  value={discount || ''}
                   onChange={e => setDiscount(Number(e.target.value))}
+                  placeholder="0"
                   className={cn(inputClass, 'w-full')}
                 />
               </div>
@@ -434,7 +455,7 @@ export default function NewInvoicePage() {
                   type="number"
                   min={0}
                   max={total}
-                  value={amountPaid}
+                  value={amountPaid || ''}
                   onChange={e => handleAmountPaidChange(Number(e.target.value))}
                   placeholder="0"
                   className={cn(inputClass, 'w-full')}
@@ -513,6 +534,15 @@ export default function NewInvoicePage() {
           onLoad={text => setNotes(prev => prev ? `${prev}\n\n${text}` : text)}
         />
       )}
+
+      <AddItemModal
+        open={addItemModalOpen}
+        onClose={() => { setAddItemModalOpen(false); setAddItemTargetLineId(null) }}
+        onSaved={newItemId => {
+          if (addItemTargetLineId) updateLineItem(addItemTargetLineId, 'itemId', newItemId)
+          setAddItemTargetLineId(null)
+        }}
+      />
     </div>
   )
 }

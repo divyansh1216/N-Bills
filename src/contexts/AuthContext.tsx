@@ -1,35 +1,54 @@
 'use client'
 
 import React, { createContext, useContext, useEffect, useState } from 'react'
-import type { User } from 'firebase/auth'
-import { onAuthChange, signOut } from '@/firebase/auth'
+
+interface AppUser {
+  name: string
+  phone: string
+}
 
 interface AuthContextValue {
-  user: User | null
+  user: AppUser | null
   loading: boolean
-  signOut: () => Promise<void>
+  setUser: (user: AppUser | null) => void
+  signOut: () => void
 }
 
 const AuthContext = createContext<AuthContextValue>({
   user: null,
   loading: true,
-  signOut: async () => {},
+  setUser: () => {},
+  signOut: () => {},
 })
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
+  const [user, setUser] = useState<AppUser | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const unsubscribe = onAuthChange(u => {
-      setUser(u)
+    function loadUser() {
+      const stored = sessionStorage.getItem('nb-user')
+      if (stored) {
+        try { setUser(JSON.parse(stored)) } catch { /* ignore */ }
+      } else {
+        setUser(null)
+      }
       setLoading(false)
-    })
-    return unsubscribe
+    }
+
+    loadUser()
+    window.addEventListener('storage', loadUser)
+    return () => window.removeEventListener('storage', loadUser)
   }, [])
 
+  function signOut() {
+    sessionStorage.removeItem('nb-user')
+    document.cookie = 'nb-session=; path=/; max-age=0'
+    window.location.href = '/login'
+  }
+
   return (
-    <AuthContext.Provider value={{ user, loading, signOut }}>
+    <AuthContext.Provider value={{ user, loading, setUser, signOut }}>
       {children}
     </AuthContext.Provider>
   )

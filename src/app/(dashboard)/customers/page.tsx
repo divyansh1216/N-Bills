@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
-import { Plus, Search, ChevronRight, Loader2 } from 'lucide-react'
+import { Plus, Search, Eye, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { orderBy } from 'firebase/firestore'
 import Header from '@/components/layout/Header'
@@ -120,7 +120,7 @@ export default function CustomersPage() {
                     <td className="px-4 py-3 text-right text-sm text-muted-foreground hidden xl:table-cell">{formatDate(customer.lastVisit)}</td>
                     <td className="px-2 sm:px-4 py-3 w-10">
                       <Link href={`/customers/${customer.id}`} className="p-1.5 text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted transition-colors flex items-center justify-center">
-                        <ChevronRight size={16} />
+                        <Eye size={16} />
                       </Link>
                     </td>
                   </motion.tr>

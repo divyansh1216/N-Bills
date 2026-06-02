@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Search, Download, Edit2, Trash2, Ruler, Image as ImageIcon, ChevronRight } from 'lucide-react'
+import { Plus, Search, Download, Edit2, Trash2, Ruler, ChevronRight, Eye, X, CalendarClock } from 'lucide-react'
 import { toast } from 'sonner'
 import { getCustomerMeasurements, deleteMeasurement } from '@/firebase/firestore'
 import { generateMeasurementPDF } from '@/lib/measurement-pdf'
@@ -41,6 +41,8 @@ export default function MeasurementTab({ customerId, customerName }: Props) {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [pdfLoading, setPdfLoading] = useState<string | null>(null)
+  const [viewItem, setViewItem] = useState<CustomerMeasurement | null>(null)
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
 
   useEffect(() => {
     load()
@@ -224,6 +226,17 @@ export default function MeasurementTab({ customerId, customerName }: Props) {
                       <span className="text-xs text-muted-foreground shrink-0">{fmtDate(m.createdAt)}</span>
                     </div>
                     <h4 className="text-sm font-semibold text-foreground">{m.label}</h4>
+                    {m.dueDate && (
+                      <div className={cn(
+                        'flex items-center gap-1 mt-1.5 text-xs font-medium px-2 py-0.5 rounded-md w-fit',
+                        new Date(m.dueDate) < new Date()
+                          ? 'bg-red-50 text-red-600 border border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900'
+                          : 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900'
+                      )}>
+                        <CalendarClock size={11} />
+                        {new Date(m.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </div>
+                    )}
                   </div>
 
                   {/* Preview measurements */}
@@ -326,6 +339,13 @@ export default function MeasurementTab({ customerId, customerName }: Props) {
                     </button>
                     <div className="flex items-center gap-1">
                       <button
+                        onClick={() => setViewItem(m)}
+                        title="View"
+                        className="p-2 text-muted-foreground hover:text-foreground rounded-xl hover:bg-muted transition-colors"
+                      >
+                        <Eye size={14} />
+                      </button>
+                      <button
                         onClick={() => handlePDF(m)}
                         disabled={pdfLoading === m.id}
                         title="Download PDF"
@@ -356,6 +376,138 @@ export default function MeasurementTab({ customerId, customerName }: Props) {
         </div>
       )}
 
+      {/* View measurement modal */}
+      <AnimatePresence>
+        {viewItem && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setViewItem(null)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 10 }}
+              transition={{ duration: 0.2 }}
+              className="relative bg-card border border-border rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto luxury-shadow-lg"
+            >
+              {/* Modal header */}
+              <div className="sticky top-0 bg-card border-b border-border px-5 py-4 flex items-start justify-between gap-3 rounded-t-2xl">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className={cn('text-xs font-medium px-2 py-0.5 rounded-md border', GARMENT_COLORS[viewItem.garmentType])}>
+                      {GARMENT_LABELS[viewItem.garmentType]}
+                    </span>
+                    <span className="text-xs text-muted-foreground border border-border px-2 py-0.5 rounded-md">
+                      {viewItem.unit === 'in' ? 'inches' : 'cm'}
+                    </span>
+                  </div>
+                  <h3 className="text-base font-semibold text-foreground">{viewItem.label}</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">{fmtDate(viewItem.createdAt)}</p>
+                  {viewItem.dueDate && (
+                    <div className={cn(
+                      'flex items-center gap-1 mt-1.5 text-xs font-medium px-2 py-0.5 rounded-md w-fit',
+                      new Date(viewItem.dueDate) < new Date()
+                        ? 'bg-red-50 text-red-600 border border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900'
+                        : 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900'
+                    )}>
+                      <CalendarClock size={11} />
+                      Due: {new Date(viewItem.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </div>
+                  )}
+                </div>
+                <button
+                  onClick={() => setViewItem(null)}
+                  className="p-1.5 text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted transition-colors shrink-0"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* All measurements */}
+              <div className="p-5 space-y-4">
+                <div className="grid grid-cols-2 gap-2">
+                  {GARMENT_FIELDS[viewItem.garmentType]
+                    .filter(f => {
+                      const v = viewItem.measurements[f.key]
+                      return v !== undefined && v !== null && v !== ''
+                    })
+                    .map(f => {
+                      const val = viewItem.measurements[f.key]
+                      return (
+                        <div key={String(f.key)} className="bg-muted/50 rounded-xl px-3 py-2.5">
+                          <p className="text-xs text-muted-foreground">{f.label}</p>
+                          <p className="text-sm font-semibold text-foreground mt-0.5">
+                            {f.type === 'number' ? `${val} ${viewItem.unit}` : String(val)}
+                          </p>
+                        </div>
+                      )
+                    })}
+                </div>
+
+                {viewItem.measurements.notes && (
+                  <div className="p-3 bg-muted/40 rounded-xl">
+                    <p className="text-xs text-muted-foreground mb-1">Special Notes</p>
+                    <p className="text-sm text-foreground leading-relaxed">{viewItem.measurements.notes}</p>
+                  </div>
+                )}
+
+                {viewItem.measurements.patternImageUrl && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1.5">Blouse Pattern</p>
+                    <img
+                      src={viewItem.measurements.patternImageUrl}
+                      alt="Pattern"
+                      className="w-full h-48 object-cover rounded-xl border border-border cursor-pointer hover:opacity-90 transition-opacity"
+                      onClick={() => setLightboxSrc(viewItem.measurements.patternImageUrl!)}
+                    />
+                  </div>
+                )}
+
+                {viewItem.measurements.designImageUrls && viewItem.measurements.designImageUrls.length > 0 && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1.5">Design References</p>
+                    <div className="grid grid-cols-4 gap-2">
+                      {viewItem.measurements.designImageUrls.map((url, idx) => (
+                        <img
+                          key={idx}
+                          src={url}
+                          alt={`Design ${idx + 1}`}
+                          className="aspect-square object-cover rounded-xl border border-border cursor-pointer hover:opacity-90 transition-opacity"
+                          onClick={() => setLightboxSrc(url)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Actions */}
+                <div className="flex gap-2 pt-1">
+                  <button
+                    onClick={() => { setEditItem(viewItem); setViewItem(null); setModalOpen(true) }}
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 border border-border rounded-xl text-sm font-medium hover:bg-muted transition-colors"
+                  >
+                    <Edit2 size={13} />
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handlePDF(viewItem)}
+                    disabled={pdfLoading === viewItem.id}
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-foreground text-background rounded-xl text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+                  >
+                    <Download size={13} />
+                    Download PDF
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       <AddMeasurementModal
         open={modalOpen}
         onClose={() => { setModalOpen(false); setEditItem(null) }}
@@ -364,6 +516,35 @@ export default function MeasurementTab({ customerId, customerName }: Props) {
         editItem={editItem}
         onSaved={handleSaved}
       />
+
+      {/* Lightbox */}
+      <AnimatePresence>
+        {lightboxSrc && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90"
+            onClick={() => setLightboxSrc(null)}
+          >
+            <button
+              className="absolute top-4 right-4 w-8 h-8 bg-white/10 rounded-full flex items-center justify-center text-white hover:bg-white/20 transition-colors"
+              onClick={() => setLightboxSrc(null)}
+            >
+              <X size={16} />
+            </button>
+            <motion.img
+              initial={{ scale: 0.92, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.92, opacity: 0 }}
+              src={lightboxSrc}
+              alt="Preview"
+              className="max-w-full max-h-full object-contain rounded-xl"
+              onClick={e => e.stopPropagation()}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Delete confirmation */}
       <AnimatePresence>

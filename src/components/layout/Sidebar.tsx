@@ -21,17 +21,13 @@ export default function Sidebar({ mobile, onClose }: SidebarProps) {
   const { user, signOut } = useAuth()
   const { name: shopName, rentalEnabled } = useShopSettings()
 
-  async function handleSignOut() {
-    await signOut()
-    document.cookie = 'nb-session=; path=/; max-age=0'
-    router.replace('/login')
+  function handleSignOut() {
+    signOut()
     toast.success('Signed out successfully')
   }
 
-  const displayName = user?.displayName || user?.email?.split('@')[0] || 'User'
-  const initials = user?.displayName
-    ? user.displayName.split(' ').filter(Boolean).map(n => n[0]).join('').slice(0, 2).toUpperCase()
-    : (user?.email?.slice(0, 2).toUpperCase() ?? 'U')
+  const displayName = user?.name || 'User'
+  const initials = displayName.split(' ').filter(Boolean).map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'U'
 
   return (
     <aside className="h-full w-72 flex flex-col bg-sidebar text-sidebar-foreground">
@@ -85,23 +81,13 @@ export default function Sidebar({ mobile, onClose }: SidebarProps) {
       {/* Bottom — user */}
       <div className="px-2 pb-3 pt-3 border-t border-white/10">
         <div className="flex items-center gap-2.5 px-3 py-2">
-          {user?.photoURL ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={user.photoURL}
-              alt={displayName}
-              referrerPolicy="no-referrer"
-              className="w-7 h-7 rounded-full object-cover shrink-0"
-            />
-          ) : (
-            <div className="w-7 h-7 rounded-full bg-white/15 flex items-center justify-center text-xs font-semibold text-white shrink-0">
-              {initials}
-            </div>
-          )}
+          <div className="w-7 h-7 rounded-full bg-white/15 flex items-center justify-center text-xs font-semibold text-white shrink-0">
+            {initials}
+          </div>
           <div className="flex-1 min-w-0">
             <p className="text-xs font-medium text-white/80 truncate">{displayName}</p>
-            {user?.displayName && user?.email && (
-              <p className="text-[10px] text-white/40 truncate">{user.email}</p>
+            {user?.phone && (
+              <p className="text-[10px] text-white/40 truncate">+91 {user.phone}</p>
             )}
           </div>
           <button

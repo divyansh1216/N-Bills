@@ -1,0 +1,14 @@
+{
+  "name": "n-bills-firestore-scripts",
+  "version": "1.0.0",
+  "description": "Firestore backup and restore scripts for N-Bills",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "backup": "node backup.js",
+    "restore": "node restore.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.0.0"
+  }
+}

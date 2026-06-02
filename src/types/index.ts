@@ -109,7 +109,7 @@ export interface CategoryDataPoint {
   color: string
 }
 
-export type GarmentType = 'blouse' | 'kurti' | 'salwar' | 'palazzo' | 'lehenga' | 'gown'
+export type GarmentType = 'blouse'  | 'kurti_salwar' | 'lehenga' | 'lehenga_blouse' | 'gown'
 export type MeasurementUnit = 'in' | 'cm'
 
 export interface GarmentMeasurements {
@@ -131,6 +131,9 @@ export interface GarmentMeasurements {
   bottomWidth?: number
   kneeWidth?: number
   fallLength?: number
+  apexPoint?: number
+  sleeveRound?: number
+  halfBody?: number
   neckShape?: string
   notes?: string
   patternImageUrl?: string
@@ -145,6 +148,7 @@ export interface CustomerMeasurement {
   garmentType: GarmentType
   unit: MeasurementUnit
   measurements: GarmentMeasurements
+  dueDate?: string
   createdAt: any
   updatedAt: any
 }
