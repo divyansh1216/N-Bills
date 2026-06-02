@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, Trash2, ArrowLeft, Loader2, FileText, Ruler } from 'lucide-react'
@@ -30,7 +30,7 @@ interface LineItemRow {
   rentalDays: number
 }
 
-export default function NewInvoicePage() {
+function NewInvoicePageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { name: shopName, tagline: shopTagline, phone: shopPhone, address: shopAddress, rentalEnabled } = useShopSettings()
@@ -544,5 +544,13 @@ export default function NewInvoicePage() {
         }}
       />
     </div>
+  )
+}
+
+export default function NewInvoicePage() {
+  return (
+    <Suspense>
+      <NewInvoicePageInner />
+    </Suspense>
   )
 }
