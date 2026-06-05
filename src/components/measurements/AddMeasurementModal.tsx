@@ -78,9 +78,16 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
     setUploadProgress(0)
   }, [open, editItem])
 
+  const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+
   function handlePatternChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
+    if (file.size > MAX_FILE_SIZE) {
+      toast.error('File size exceeds 10MB limit')
+      e.target.value = ''
+      return
+    }
     setPatternFile(file)
     setPatternPreview(URL.createObjectURL(file))
   }
@@ -88,6 +95,12 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
   function handleDesignChange(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files || []).slice(0, 4 - designPreviews.length - designFiles.length)
     if (!files.length) return
+    const invalidFiles = files.filter(f => f.size > MAX_FILE_SIZE)
+    if (invalidFiles.length > 0) {
+      toast.error(`${invalidFiles.length} file(s) exceed 10MB limit`)
+      e.target.value = ''
+      return
+    }
     setDesignFiles(prev => [...prev, ...files])
     setDesignPreviews(prev => [...prev, ...files.map(f => URL.createObjectURL(f))])
     e.target.value = ''
