@@ -212,52 +212,32 @@ export default function MeasurementTab({ customerId, customerName }: Props) {
                   transition={{ delay: i * 0.04 }}
                   className="bg-card border border-border rounded-2xl overflow-hidden luxury-shadow hover:border-foreground/20 transition-colors"
                 >
-                  {/* Card header */}
-                  <div className="p-4 pb-3">
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className={cn('text-xs font-medium px-2 py-0.5 rounded-md border', GARMENT_COLORS[m.garmentType])}>
-                          {GARMENT_LABELS[m.garmentType]}
-                        </span>
-                        <span className="text-xs text-muted-foreground border border-border px-2 py-0.5 rounded-md">
-                          {m.unit === 'in' ? 'inches' : 'cm'}
-                        </span>
-                      </div>
-                      <span className="text-xs text-muted-foreground shrink-0">{fmtDate(m.createdAt)}</span>
+                  {/* Card header - Clickable to expand */}
+                  <button
+                    onClick={() => setExpandedId(isExpanded ? null : m.id)}
+                    className="w-full p-4 text-left hover:bg-muted/30 transition-colors flex items-start justify-between gap-3"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-sm font-semibold text-foreground">{m.label}</h4>
+                      <span className="text-xs text-muted-foreground mt-1 block">{fmtDate(m.createdAt)}</span>
+                      {m.dueDate && (
+                        <div className={cn(
+                          'flex items-center gap-1 mt-1.5 text-xs font-medium px-2 py-0.5 rounded-md w-fit',
+                          new Date(m.dueDate) < new Date()
+                            ? 'bg-red-50 text-red-600 border border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900'
+                            : 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900'
+                        )}>
+                          <CalendarClock size={11} />
+                          {new Date(m.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </div>
+                      )}
                     </div>
-                    <h4 className="text-sm font-semibold text-foreground">{m.label}</h4>
-                    {m.dueDate && (
-                      <div className={cn(
-                        'flex items-center gap-1 mt-1.5 text-xs font-medium px-2 py-0.5 rounded-md w-fit',
-                        new Date(m.dueDate) < new Date()
-                          ? 'bg-red-50 text-red-600 border border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900'
-                          : 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900'
-                      )}>
-                        <CalendarClock size={11} />
-                        {new Date(m.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                      </div>
-                    )}
-                  </div>
+                    <motion.div animate={{ rotate: isExpanded ? 180 : 0 }} transition={{ duration: 0.2 }} className="shrink-0 mt-1">
+                      <ChevronRight size={18} className="text-muted-foreground" />
+                    </motion.div>
+                  </button>
 
-                  {/* Preview measurements */}
-                  <div className="px-4 pb-3">
-                    <div className="grid grid-cols-2 gap-2">
-                      {previewFields.map(f => {
-                        const val = m.measurements[f.key]
-                        if (!val) return null
-                        return (
-                          <div key={String(f.key)} className="bg-muted/60 rounded-xl px-3 py-2">
-                            <p className="text-xs text-muted-foreground">{f.label}</p>
-                            <p className="text-sm font-semibold text-foreground mt-0.5">
-                              {val}{f.type === 'number' ? `"` : ''}
-                            </p>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Expanded: all fields */}
+                  {/* Content: shown when expanded */}
                   <AnimatePresence>
                     {isExpanded && (
                       <motion.div
@@ -265,26 +245,55 @@ export default function MeasurementTab({ customerId, customerName }: Props) {
                         animate={{ height: 'auto', opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
                         transition={{ duration: 0.2 }}
-                        className="overflow-hidden"
+                        className="overflow-hidden border-t border-border"
                       >
-                        <div className="px-4 pb-3 border-t border-border pt-3">
-                          <div className="grid grid-cols-2 gap-2">
-                            {allFields.filter(f => {
-                              const v = m.measurements[f.key]
-                              return v !== undefined && v !== null && v !== '' &&
-                                !previewFields.find(pf => pf.key === f.key)
-                            }).map(f => {
-                              const val = m.measurements[f.key]
-                              return (
-                                <div key={String(f.key)} className="bg-muted/40 rounded-xl px-3 py-2">
-                                  <p className="text-xs text-muted-foreground">{f.label}</p>
-                                  <p className="text-sm font-semibold text-foreground mt-0.5">
-                                    {f.type === 'number' ? `${val}${m.unit}` : String(val)}
-                                  </p>
-                                </div>
-                              )
-                            })}
+                        <div className="px-4 py-3 space-y-3">
+                          {/* Preview measurements */}
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-2 font-medium">Measurements</p>
+                            <div className="grid grid-cols-2 gap-2">
+                              {previewFields.map(f => {
+                                const val = m.measurements[f.key]
+                                if (!val) return null
+                                return (
+                                  <div key={String(f.key)} className="bg-muted/60 rounded-xl px-3 py-2">
+                                    <p className="text-xs text-muted-foreground">{f.label}</p>
+                                    <p className="text-sm font-semibold text-foreground mt-0.5">
+                                      {val}{f.type === 'number' ? `"` : ''}
+                                    </p>
+                                  </div>
+                                )
+                              })}
+                            </div>
                           </div>
+
+                          {/* All other fields */}
+                          {allFields.filter(f => {
+                            const v = m.measurements[f.key]
+                            return v !== undefined && v !== null && v !== '' &&
+                              !previewFields.find(pf => pf.key === f.key)
+                          }).length > 0 && (
+                            <div>
+                              <p className="text-xs text-muted-foreground mb-2 font-medium">Additional Fields</p>
+                              <div className="grid grid-cols-2 gap-2">
+                                {allFields.filter(f => {
+                                  const v = m.measurements[f.key]
+                                  return v !== undefined && v !== null && v !== '' &&
+                                    !previewFields.find(pf => pf.key === f.key)
+                                }).map(f => {
+                                  const val = m.measurements[f.key]
+                                  return (
+                                    <div key={String(f.key)} className="bg-muted/40 rounded-xl px-3 py-2">
+                                      <p className="text-xs text-muted-foreground">{f.label}</p>
+                                      <p className="text-sm font-semibold text-foreground mt-0.5">
+                                        {f.type === 'number' ? `${val}${m.unit}` : String(val)}
+                                      </p>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          )}
 
                           {m.measurements.notes && (
                             <div className="mt-3 p-3 bg-muted/40 rounded-xl">
@@ -326,18 +335,9 @@ export default function MeasurementTab({ customerId, customerName }: Props) {
                     )}
                   </AnimatePresence>
 
-                  {/* Actions */}
-                  <div className="px-4 py-3 border-t border-border flex items-center justify-between gap-2">
-                    <button
-                      onClick={() => setExpandedId(isExpanded ? null : m.id)}
-                      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      {isExpanded ? 'Show less' : 'View all'}
-                      <motion.div animate={{ rotate: isExpanded ? 90 : 0 }}>
-                        <ChevronRight size={12} />
-                      </motion.div>
-                    </button>
-                    <div className="flex items-center gap-1">
+                  {/* Actions - shown only when collapsed */}
+                  {!isExpanded && (
+                    <div className="px-4 py-3 border-t border-border flex items-center justify-end gap-2">
                       <button
                         onClick={() => setViewItem(m)}
                         title="View"
@@ -368,7 +368,42 @@ export default function MeasurementTab({ customerId, customerName }: Props) {
                         <Trash2 size={14} />
                       </button>
                     </div>
-                  </div>
+                  )}
+
+                  {/* Actions - shown when expanded */}
+                  {isExpanded && (
+                    <div className="px-4 py-3 border-t border-border flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => setViewItem(m)}
+                        title="View"
+                        className="p-2 text-muted-foreground hover:text-foreground rounded-xl hover:bg-muted transition-colors"
+                      >
+                        <Eye size={14} />
+                      </button>
+                      <button
+                        onClick={() => handlePDF(m)}
+                        disabled={pdfLoading === m.id}
+                        title="Download PDF"
+                        className="p-2 text-muted-foreground hover:text-foreground rounded-xl hover:bg-muted transition-colors disabled:opacity-50"
+                      >
+                        <Download size={14} />
+                      </button>
+                      <button
+                        onClick={() => { setEditItem(m); setModalOpen(true) }}
+                        title="Edit"
+                        className="p-2 text-muted-foreground hover:text-foreground rounded-xl hover:bg-muted transition-colors"
+                      >
+                        <Edit2 size={14} />
+                      </button>
+                      <button
+                        onClick={() => setConfirmDelete(m.id)}
+                        title="Delete"
+                        className="p-2 text-muted-foreground hover:text-red-500 rounded-xl hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  )}
                 </motion.div>
               )
             })}

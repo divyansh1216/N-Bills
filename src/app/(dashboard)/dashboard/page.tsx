@@ -70,6 +70,7 @@ export default function DashboardPage() {
   }, [invoices, customers, rentals])
 
   const recentInvoices = invoices.slice(0, 8)
+  const recentCustomers = customers.slice(0, 5)
 
   const needsAttention = useMemo(() => {
     const now = new Date()
@@ -97,8 +98,43 @@ export default function DashboardPage() {
           )}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-5">
+ 
+          {/* Recent Customers */}
+          <div className="bg-card border border-border rounded-2xl overflow-hidden luxury-shadow">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+              <h3 className="text-sm font-semibold text-foreground">Recent Customers</h3>
+              <Link href="/customers" className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors">
+                View all <ChevronRight size={13} />
+              </Link>
+            </div>
+            <div className="space-y-2 p-4">
+              {loading ? (
+                Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)
+              ) : recentCustomers.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">No customers yet</p>
+              ) : (
+                recentCustomers.map((cust, i) => (
+                  <Link
+                    key={cust.id}
+                    href={`/customers/${cust.id}`}
+                    className="flex items-center justify-between py-2 hover:bg-muted -mx-1 px-1 rounded-lg transition-colors"
+                  >
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-xs font-semibold shrink-0">
+                        {cust.name.slice(0, 2).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">{cust.name}</p>
+                        <p className="text-xs text-muted-foreground truncate">{cust.phone || "No phone"}</p>
+                      </div>
+                    </div>
+                    <ChevronRight size={14} className="text-muted-foreground shrink-0" />
+                  </Link>
+                ))
+              )}
+            </div>
+          </div>
           {/* Recent invoices */}
           <div className="lg:col-span-2 bg-card border border-border rounded-2xl overflow-hidden luxury-shadow">
             <div className="flex items-center justify-between px-5 py-4 border-b border-border">
@@ -159,8 +195,9 @@ export default function DashboardPage() {
             </div>
           </div>
 
+
           {/* Needs attention */}
-          <div className="space-y-4">
+          <div className="space-y-4 lg:col-span-1">
 
             {/* Overdue rentals */}
             {rentalEnabled && <div className="bg-card border border-border rounded-2xl p-5 luxury-shadow">

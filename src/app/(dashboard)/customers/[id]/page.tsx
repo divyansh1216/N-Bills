@@ -37,6 +37,7 @@ export default function CustomerProfilePage() {
   const [saving, setSaving] = useState(false)
   const [statusDropdown, setStatusDropdown] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<Tab>('measurements')
+  const [detailsExpanded, setDetailsExpanded] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -45,7 +46,7 @@ export default function CustomerProfilePage() {
         if (custSnap.exists()) {
           const c = { id: custSnap.id, ...custSnap.data() } as Customer
           setCustomer(c)
-          setEditForm({ name: c.name, phone: c.phone, email: c.email || '', address: c.address || '' })
+          setEditForm({ name: c.name, phone: c.phone || '', email: c.email || '', address: c.address || '' })
         }
       } catch (err) {
         console.error('Failed to load customer:', err)
@@ -79,17 +80,21 @@ export default function CustomerProfilePage() {
 
   function cancelEdit() {
     if (!customer) return
-    setEditForm({ name: customer.name, phone: customer.phone, email: customer.email || '', address: customer.address || '' })
+    setEditForm({ name: customer.name, phone: customer.phone || '', email: customer.email || '', address: customer.address || '' })
     setEditMode(false)
   }
 
   async function handleSaveCustomer() {
     if (!customer) return
+    if (!editForm.name.trim()) {
+      toast.error('Full Name is required. Please fill it first to proceed')
+      return
+    }
     setSaving(true)
     try {
       const updates = {
         name: editForm.name.trim(),
-        phone: editForm.phone.trim(),
+        phone: editForm.phone.trim() || undefined,
         email: editForm.email.trim() || undefined,
         address: editForm.address.trim() || undefined,
       }
@@ -166,28 +171,42 @@ export default function CustomerProfilePage() {
               </div>
             ) : customer && (
               <motion.div initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.4 }}>
-                <div className="bg-card border border-border rounded-2xl p-6 luxury-shadow space-y-5">
+                <div className="bg-card border border-border rounded-2xl luxury-shadow">
+                  {/* Collapsible header */}
+                  <button
+                    onClick={() => setDetailsExpanded(!detailsExpanded)}
+                    className="w-full p-6 flex items-center justify-between hover:bg-muted/30 transition-colors rounded-t-2xl"
+                  >
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center text-sm font-bold text-foreground shrink-0">
+                        {customer.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="text-sm font-semibold text-foreground truncate">{customer.name}</h3>
+                        <p className="text-xs text-muted-foreground">{customer.phone}</p>
+                      </div>
+                    </div>
+                    <motion.div animate={{ rotate: detailsExpanded ? 180 : 0 }} transition={{ duration: 0.2 }}>
+                      <ChevronDown size={18} className="text-muted-foreground shrink-0" />
+                    </motion.div>
+                  </button>
 
-                  {/* Avatar + name row */}
-                  <div className="flex items-start gap-3">
-                    <div className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center text-base font-bold text-foreground shrink-0">
-                      {customer.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      {editMode ? (
-                        <input
-                          value={editForm.name}
-                          onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
-                          placeholder="Full Name"
-                          className={inputClass}
-                        />
-                      ) : (
-                        <h2 className="text-base font-semibold text-foreground truncate">{customer.name}</h2>
-                      )}
-                      <span className={cn('text-xs font-medium border px-2 py-0.5 rounded-md mt-1.5 inline-block', TIER_COLORS[customer.tier])}>
-                        {TIER_LABELS[customer.tier]}
-                      </span>
-                    </div>
+                  <AnimatePresence>
+                    {detailsExpanded && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.3 }}
+                        className="overflow-hidden border-t border-border"
+                      >
+                        <div className="p-6 space-y-5">
+
+                  {/* Edit button and tier badge */}
+                  <div className="flex items-center justify-between">
+                    <span className={cn('text-xs font-medium border px-2 py-0.5 rounded-md', TIER_COLORS[customer.tier])}>
+                      {TIER_LABELS[customer.tier]}
+                    </span>
                     {!editMode && (
                       <button
                         onClick={() => setEditMode(true)}
@@ -203,11 +222,20 @@ export default function CustomerProfilePage() {
                     {editMode ? (
                       <>
                         <div>
-                          <label className="text-xs text-muted-foreground mb-1 block">Phone *</label>
+                          <label className="text-xs text-muted-foreground mb-1 block">Full Name *</label>
+                          <input
+                            value={editForm.name}
+                            onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
+                            placeholder="Full Name"
+                            className={inputClass}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-muted-foreground mb-1 block">Phone</label>
                           <input
                             value={editForm.phone}
                             onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))}
-                            placeholder="+91 98765 43210"
+                            placeholder="+91 98765 43210 (optional)"
                             className={inputClass}
                           />
                         </div>
@@ -295,6 +323,10 @@ export default function CustomerProfilePage() {
                       <p className="text-sm font-medium text-foreground">{formatDate(customer.joinedAt)}</p>
                     </div>
                   </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               </motion.div>
             )}

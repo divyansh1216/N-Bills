@@ -19,16 +19,41 @@ import { cn } from '@/lib/utils'
 
 export default function CustomersPage() {
   const { data: customers, loading } = useFirestoreCollection<Customer>('customers', [orderBy('totalSpent', 'desc')])
+  const { data: measurements } = useFirestoreCollection<{ customerId: string; dueDate?: string }>('measurements')
   const [search, setSearch] = useState('')
   const [addModalOpen, setAddModalOpen] = useState(false)
   const debouncedSearch = useDebounce(search, 250)
 
-  const filtered = useMemo(() =>
-    customers.filter(c =>
+  // Map customerId → nearest upcoming dueDate string
+  const nearestDueMap = useMemo(() => {
+    const map: Record<string, string> = {}
+    for (const m of measurements) {
+      if (!m.dueDate || !m.customerId) continue
+      const d = new Date(m.dueDate)
+      const existing = map[m.customerId]
+      if (!existing || d < new Date(existing)) {
+        map[m.customerId] = m.dueDate
+      }
+    }
+    return map
+  }, [measurements])
+
+  const filtered = useMemo(() => {
+    const base = customers.filter(c =>
       !debouncedSearch ||
       c.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-      c.phone.includes(debouncedSearch)
-    ), [customers, debouncedSearch])
+      (c.phone && c.phone.includes(debouncedSearch))
+    )
+    // Sort: customers with a nearest due date come first (soonest first), rest after
+    return [...base].sort((a, b) => {
+      const da = nearestDueMap[a.id]
+      const db_ = nearestDueMap[b.id]
+      if (da && db_) return new Date(da).getTime() - new Date(db_).getTime()
+      if (da) return -1
+      if (db_) return 1
+      return 0
+    })
+  }, [customers, debouncedSearch, nearestDueMap])
 
   return (
     <div>
@@ -82,14 +107,13 @@ export default function CustomersPage() {
                 <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3 hidden sm:table-cell">Phone</th>
                 <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3 hidden md:table-cell">Tier</th>
                 <th className="text-right text-xs font-medium text-muted-foreground px-4 py-3 hidden lg:table-cell">Orders</th>
-                <th className="text-right text-xs font-medium text-muted-foreground px-4 py-3">Total Spent</th>
                 <th className="text-right text-xs font-medium text-muted-foreground px-4 py-3 hidden xl:table-cell">Last Visit</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody>
               {loading
-                ? Array.from({ length: 8 }).map((_, i) => <TableRowSkeleton key={i} cols={7} />)
+                ? Array.from({ length: 8 }).map((_, i) => <TableRowSkeleton key={i} cols={6} />)
                 : filtered.map((customer, i) => (
                   <motion.tr
                     key={customer.id}
@@ -105,7 +129,26 @@ export default function CustomersPage() {
                         </div>
                         <div className="min-w-0">
                           <span className="block text-sm font-medium text-foreground truncate">{customer.name}</span>
-                          <span className="block text-xs text-muted-foreground truncate sm:hidden">{customer.phone}</span>
+                          {nearestDueMap[customer.id] ? (
+                            (() => {
+                              const dueDate = new Date(nearestDueMap[customer.id])
+                              const today = new Date()
+                              const daysUntilDue = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+                              const isUrgent = daysUntilDue <= 6
+                              return (
+                                <span className={cn(
+                                  'inline-block text-xs font-medium px-1.5 py-0.5 rounded mt-0.5 sm:hidden',
+                                  isUrgent
+                                    ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
+                                    : 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
+                                )}>
+                                  Due {formatDate(nearestDueMap[customer.id])}
+                                </span>
+                              )
+                            })()
+                          ) : (
+                            <span className="block text-xs text-muted-foreground truncate sm:hidden">{customer.phone}</span>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -116,11 +159,11 @@ export default function CustomersPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right text-sm text-foreground hidden lg:table-cell">{customer.totalOrders}</td>
-                    <td className="px-3 sm:px-4 py-3 text-right text-sm font-semibold text-foreground whitespace-nowrap">{formatCurrency(customer.totalSpent)}</td>
                     <td className="px-4 py-3 text-right text-sm text-muted-foreground hidden xl:table-cell">{formatDate(customer.lastVisit)}</td>
-                    <td className="px-2 sm:px-4 py-3 w-10">
-                      <Link href={`/customers/${customer.id}`} className="p-1.5 text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted transition-colors flex items-center justify-center">
-                        <Eye size={16} />
+                    <td className="px-2 sm:px-4 py-3 text-right">
+                      <Link href={`/customers/${customer.id}`} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-primary/5 text-primary hover:bg-primary/10 rounded-lg font-medium text-xs transition-colors">
+                        <Eye size={14} />
+                        <span>View Details</span>
                       </Link>
                     </td>
                   </motion.tr>
@@ -154,11 +197,15 @@ function AddCustomerModal({ onClose }: { onClose: () => void }) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (!form.name.trim()) {
+      toast.error('Full Name is required. Please fill it first to proceed')
+      return
+    }
     setLoading(true)
     try {
       await addCustomer({
         name: form.name.trim(),
-        phone: form.phone.trim(),
+        phone: form.phone.trim() || undefined,
         email: form.email.trim() || undefined,
         address: form.address.trim() || undefined,
         totalSpent: 0,
@@ -202,8 +249,8 @@ function AddCustomerModal({ onClose }: { onClose: () => void }) {
             <input required value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Priya Sharma" className={inputClass} />
           </div>
           <div>
-            <label className="text-sm font-medium block mb-1.5">Phone *</label>
-            <input required value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="+91 98765 43210" className={inputClass} />
+            <label className="text-sm font-medium block mb-1.5">Phone</label>
+            <input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="+91 98765 43210" className={inputClass} />
           </div>
           <div>
             <label className="text-sm font-medium block mb-1.5">Email</label>

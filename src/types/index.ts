@@ -33,7 +33,7 @@ export interface InventoryItem {
 export interface Customer {
   id: string
   name: string
-  phone: string
+  phone?: string
   email?: string
   address?: string
   totalSpent: number
@@ -59,7 +59,7 @@ export interface Invoice {
   invoiceNumber: string
   customerId: string
   customerName: string
-  customerPhone: string
+  customerPhone?: string
   items: InvoiceLineItem[]
   subtotal: number
   discount: number
@@ -78,7 +78,7 @@ export interface Rental {
   invoiceId: string
   customerId: string
   customerName: string
-  customerPhone: string
+  customerPhone?: string
   items: InvoiceLineItem[]
   depositPaid: number
   rentalDate: string
@@ -135,6 +135,7 @@ export interface GarmentMeasurements {
   sleeveRound?: number
   halfBody?: number
   neckShape?: string
+  totalItems?: number
   notes?: string
   patternImageUrl?: string
   designImageUrls?: string[]

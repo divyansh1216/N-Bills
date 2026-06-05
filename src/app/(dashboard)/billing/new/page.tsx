@@ -67,7 +67,7 @@ function NewInvoicePageInner() {
   const filteredCustomers = useMemo(() =>
     customers.filter(c =>
       c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
-      c.phone.includes(customerSearch)
+      (c.phone && c.phone.includes(customerSearch))
     ).slice(0, 6),
     [customers, customerSearch]
   )
@@ -259,7 +259,7 @@ function NewInvoicePageInner() {
                           </div>
                           <div>
                             <p className="text-sm font-medium text-foreground">{c.name}</p>
-                            <p className="text-xs text-muted-foreground">{c.phone}</p>
+                            <p className="text-xs text-muted-foreground">{c.phone || "—"}</p>
                           </div>
                         </button>
                       ))}
@@ -274,7 +274,7 @@ function NewInvoicePageInner() {
                   className="mt-3 p-3 bg-muted rounded-xl text-sm"
                 >
                   <p className="font-medium text-foreground">{selectedCustomer.name}</p>
-                  <p className="text-muted-foreground text-xs mt-0.5">{selectedCustomer.phone} · {selectedCustomer.email || 'No email'}</p>
+                  <p className="text-muted-foreground text-xs mt-0.5">{selectedCustomer.phone || "—"} · {selectedCustomer.email || 'No email'}</p>
                 </motion.div>
               )}
             </div>

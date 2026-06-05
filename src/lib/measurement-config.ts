@@ -40,6 +40,7 @@ export const GARMENT_FIELDS: Record<GarmentType, FieldConfig[]> = {
     { key: 'sleeveRound', label: 'Sleeve Round', type: 'number', unit: true },
     { key: 'halfBody', label: 'Half Body', type: 'number', unit: true },
     { key: 'neckShape', label: 'Neck Shape', type: 'text', placeholder: 'Round, V-neck, Square, Boat...' },
+    { key: 'totalItems', label: 'Total Items', type: 'number' },
   ],
   kurti_salwar: [
     // Kurti part
@@ -57,6 +58,7 @@ export const GARMENT_FIELDS: Record<GarmentType, FieldConfig[]> = {
     { key: 'salwarLength', label: 'Salwar Length', type: 'number', unit: true },
     { key: 'bottomWidth', label: 'Bottom Width', type: 'number', unit: true },
     { key: 'kneeWidth', label: 'Knee Width', type: 'number', unit: true },
+    { key: 'totalItems', label: 'Total Items', type: 'number' },
   ],
   lehenga: [
     { key: 'waist', label: 'Waist', type: 'number', unit: true },
@@ -66,6 +68,7 @@ export const GARMENT_FIELDS: Record<GarmentType, FieldConfig[]> = {
     { key: 'apexPoint', label: 'Apex Point', type: 'number', unit: true },
     { key: 'sleeveRound', label: 'Sleeve Round', type: 'number', unit: true },
     { key: 'halfBody', label: 'Half Body', type: 'number', unit: true },
+    { key: 'totalItems', label: 'Total Items', type: 'number' },
   ],
   lehenga_blouse: [
     // Blouse part
@@ -86,6 +89,7 @@ export const GARMENT_FIELDS: Record<GarmentType, FieldConfig[]> = {
     // Lehenga part
     { key: 'lehengaLength', label: 'Lehenga Length', type: 'number', unit: true },
     { key: 'fallLength', label: 'Fall Length', type: 'number', unit: true },
+    { key: 'totalItems', label: 'Total Items', type: 'number' },
   ],
   gown: [
     { key: 'bust', label: 'Bust', type: 'number', unit: true },
@@ -100,6 +104,7 @@ export const GARMENT_FIELDS: Record<GarmentType, FieldConfig[]> = {
     { key: 'sleeveRound', label: 'Sleeve Round', type: 'number', unit: true },
     { key: 'halfBody', label: 'Half Body', type: 'number', unit: true },
     { key: 'neckShape', label: 'Neck Shape', type: 'text', placeholder: 'Round, V-neck, Halter...' },
+    { key: 'totalItems', label: 'Total Items', type: 'number' },
   ],
 }
 
