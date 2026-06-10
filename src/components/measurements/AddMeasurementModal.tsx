@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Loader2, Image as ImageIcon, Plus, Trash2, Camera } from 'lucide-react'
+import { X, Loader2, Plus, Trash2, Camera } from 'lucide-react'
 import { toast } from 'sonner'
 import { addMeasurement, updateMeasurement } from '@/firebase/firestore'
 import { uploadMeasurementImage } from '@/lib/cloudinary'
@@ -42,8 +42,6 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
   const [fieldValues, setFieldValues] = useState<FieldValues>(emptyFields())
   const [notes, setNotes] = useState('')
   const [dueDate, setDueDate] = useState('')
-  const [patternFile, setPatternFile] = useState<File | null>(null)
-  const [patternPreview, setPatternPreview] = useState('')
   const [designFiles, setDesignFiles] = useState<File[]>([])
   const [designPreviews, setDesignPreviews] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
@@ -53,9 +51,7 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
   const [editingLabel, setEditingLabel] = useState<string | null>(null)
   const [fieldLabels, setFieldLabels] = useState<Record<string, string>>({})
 
-  const patternRef = useRef<HTMLInputElement>(null)
   const editingInputRef = useRef<HTMLInputElement>(null)
-  const patternCameraRef = useRef<HTMLInputElement>(null)
   const designRef = useRef<HTMLInputElement>(null)
   const designCameraRef = useRef<HTMLInputElement>(null)
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
@@ -68,7 +64,6 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
       setFieldValues(toFieldValues(editItem.measurements))
       setNotes(editItem.measurements.notes || '')
       setDueDate(editItem.dueDate || '')
-      setPatternPreview(editItem.measurements.patternImageUrl || '')
       setDesignPreviews(editItem.measurements.designImageUrls || [])
       // Load saved hidden fields
       const savedHidden = editItem.measurements.hiddenFields || []
@@ -79,7 +74,6 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
       setFieldValues(emptyFields())
       setNotes('')
       setDueDate('')
-      setPatternPreview('')
       setDesignPreviews([])
       // For new measurement, hide ALL fields by default (user must add them)
       const allNumericFieldKeys = GARMENT_FIELDS['blouse']
@@ -87,7 +81,6 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
         .map(f => String(f.key))
       setHiddenFields(allNumericFieldKeys)
     }
-    setPatternFile(null)
     setDesignFiles([])
     setUploadProgress(0)
     setShowAddFields(false)
@@ -106,18 +99,6 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
   }, [garmentType, open, editItem])
 
   const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
-
-  function handlePatternChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    if (file.size > MAX_FILE_SIZE) {
-      toast.error('File size exceeds 10MB limit')
-      e.target.value = ''
-      return
-    }
-    setPatternFile(file)
-    setPatternPreview(URL.createObjectURL(file))
-  }
 
   function handleDesignChange(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files || []).slice(0, 4 - designPreviews.length - designFiles.length)
@@ -196,7 +177,7 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
         measurements.hiddenFields = hiddenFields
       }
 
-      const totalUploads = (patternFile ? 1 : 0) + designFiles.length
+      const totalUploads = designFiles.length
       let done = 0
 
       // Determine the real document ID before uploading images
@@ -219,17 +200,7 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
         docId = ref.id
       }
 
-      let patternImageUrl = editItem?.measurements.patternImageUrl || ''
       let designImageUrls = [...(editItem?.measurements.designImageUrls || [])]
-
-      if (patternFile) {
-        patternImageUrl = await uploadMeasurementImage(
-          patternFile, customerId, docId, 'pattern',
-          p => setUploadProgress(Math.round(((done + p / 100) / totalUploads) * 100))
-        )
-        done++
-        setUploadProgress(Math.round((done / totalUploads) * 100))
-      }
 
       for (let i = 0; i < designFiles.length; i++) {
         const file = designFiles[i]
@@ -242,7 +213,6 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
         setUploadProgress(Math.round((done / totalUploads) * 100))
       }
 
-      if (patternImageUrl) measurements.patternImageUrl = patternImageUrl
       if (designImageUrls.length) measurements.designImageUrls = designImageUrls
 
       // Update the doc with final image URLs (always update to set images)
@@ -521,54 +491,6 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
                   className={cn(inputClass, 'resize-none')}
                 />
               </div>
-
-              {/* Blouse pattern upload */}
-              {garmentType === 'blouse' && (
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground mb-2 block">Blouse Pattern</label>
-                  {patternPreview ? (
-                    <div className="relative h-28 rounded-xl overflow-hidden border border-border group">
-                      <img
-                        src={patternPreview}
-                        alt="Pattern"
-                        className="w-full h-full object-cover cursor-pointer"
-                        onClick={() => setLightboxSrc(patternPreview)}
-                      />
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3 pointer-events-none">
-                        <p className="text-white text-xs font-medium">Tap to view</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => { setPatternFile(null); setPatternPreview('') }}
-                        className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/60 rounded-full flex items-center justify-center text-white"
-                      >
-                        <X size={12} />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => patternCameraRef.current?.click()}
-                        className="flex-1 h-16 border-2 border-dashed border-border rounded-xl hover:border-foreground/30 transition-colors flex flex-col items-center justify-center gap-1"
-                      >
-                        <Camera size={16} className="text-muted-foreground" />
-                        <span className="text-xs text-muted-foreground">Camera</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => patternRef.current?.click()}
-                        className="flex-1 h-16 border-2 border-dashed border-border rounded-xl hover:border-foreground/30 transition-colors flex flex-col items-center justify-center gap-1"
-                      >
-                        <ImageIcon size={16} className="text-muted-foreground" />
-                        <span className="text-xs text-muted-foreground">Gallery</span>
-                      </button>
-                    </div>
-                  )}
-                  <input ref={patternCameraRef} type="file" accept="image/*" capture="environment" onChange={handlePatternChange} className="hidden" />
-                  <input ref={patternRef} type="file" accept="image/*" onChange={handlePatternChange} className="hidden" />
-                </div>
-              )}
 
               {/* Design reference images */}
               <div>
