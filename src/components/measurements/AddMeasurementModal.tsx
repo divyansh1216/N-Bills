@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Loader2, Image as ImageIcon, Plus, Trash2, Camera, ChevronDown } from 'lucide-react'
+import { X, Loader2, Image as ImageIcon, Plus, Trash2, Camera } from 'lucide-react'
 import { toast } from 'sonner'
 import { addMeasurement, updateMeasurement } from '@/firebase/firestore'
 import { uploadMeasurementImage } from '@/lib/cloudinary'
@@ -372,6 +372,76 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
                   </label>
                   <span className="text-xs text-muted-foreground">inches</span>
                 </div>
+
+                {/* Add Fields Section - Prominent Display */}
+                {getHiddenFields(fields.filter(f => f.type === 'number'), hiddenFields).length > 0 && (
+                  <div className="mb-4 p-4 rounded-xl bg-gradient-to-r from-primary/5 to-primary/10 border border-primary/30 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-1">
+                        <p className="text-sm font-semibold text-foreground">Select Measurement Fields</p>
+                        <p className="text-xs text-muted-foreground">Choose which fields you want to measure for this garment</p>
+                      </div>
+                      <div className="text-right">
+                        <span className="inline-block px-2 py-1 rounded-lg bg-primary/20 text-primary text-xs font-medium">
+                          {getHiddenFields(fields.filter(f => f.type === 'number'), hiddenFields).length} available
+                        </span>
+                      </div>
+                    </div>
+
+                    <AnimatePresence>
+                      {!showAddFields && (
+                        <motion.button
+                          type="button"
+                          onClick={() => setShowAddFields(true)}
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg font-medium text-sm hover:opacity-90 transition-all"
+                        >
+                          <Plus size={16} />
+                          Add Fields
+                        </motion.button>
+                      )}
+                    </AnimatePresence>
+
+                    <AnimatePresence>
+                      {showAddFields && (
+                        <motion.div
+                          key="add-fields-list"
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="grid grid-cols-2 sm:grid-cols-3 gap-2 overflow-hidden"
+                        >
+                          {getHiddenFields(fields.filter(f => f.type === 'number'), hiddenFields).map(field => (
+                            <motion.button
+                              key={String(field.key)}
+                              type="button"
+                              onClick={() => showField(String(field.key))}
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                              className="px-3 py-2 rounded-lg bg-background border border-primary/40 hover:border-primary hover:bg-primary/5 text-foreground text-xs font-medium transition-all duration-200"
+                            >
+                              <Plus size={12} className="inline mr-1" />
+                              {field.label}
+                            </motion.button>
+                          ))}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                    {showAddFields && (
+                      <button
+                        type="button"
+                        onClick={() => setShowAddFields(false)}
+                        className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors py-1"
+                      >
+                        Hide fields
+                      </button>
+                    )}
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {fields.filter(f => f.type === 'number' && !hiddenFields.includes(String(f.key))).map(field => (
                     <div
@@ -438,54 +508,6 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
                     />
                   </div>
                 ))}
-
-                {/* Add Fields Section */}
-                {getHiddenFields(fields.filter(f => f.type === 'number'), hiddenFields).length > 0 && (
-                  <div className="mt-4 pt-4 border-t border-border">
-                    <button
-                      type="button"
-                      onClick={() => setShowAddFields(!showAddFields)}
-                      className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-muted transition-colors text-sm font-medium text-muted-foreground hover:text-foreground"
-                    >
-                      <span className="flex items-center gap-2">
-                        <Plus size={14} />
-                        Add Fields ({getHiddenFields(fields.filter(f => f.type === 'number'), hiddenFields).length})
-                      </span>
-                      <ChevronDown
-                        size={16}
-                        className={cn(
-                          'transition-transform',
-                          showAddFields && 'rotate-180'
-                        )}
-                      />
-                    </button>
-
-                    <AnimatePresence>
-                      {showAddFields && (
-                        <motion.div
-                          key="add-fields-panel"
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: 'auto' }}
-                          exit={{ opacity: 0, height: 0 }}
-                          transition={{ duration: 0.2 }}
-                          className="mt-2 space-y-1.5 overflow-hidden"
-                        >
-                          {getHiddenFields(fields.filter(f => f.type === 'number'), hiddenFields).map(field => (
-                            <button
-                              key={String(field.key)}
-                              type="button"
-                              onClick={() => showField(String(field.key))}
-                              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 hover:bg-muted text-sm text-foreground transition-colors text-left group"
-                            >
-                              <Plus size={14} className="text-muted-foreground group-hover:text-foreground transition-colors" />
-                              <span>{field.label}</span>
-                            </button>
-                          ))}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                )}
               </div>
 
               {/* Notes */}
