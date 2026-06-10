@@ -2,12 +2,12 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Loader2, Image as ImageIcon, Plus, Trash2, Camera, GripVertical, ChevronDown } from 'lucide-react'
+import { X, Loader2, Image as ImageIcon, Plus, Trash2, Camera, ChevronDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { addMeasurement, updateMeasurement } from '@/firebase/firestore'
 import { uploadMeasurementImage } from '@/lib/cloudinary'
 import { GARMENT_FIELDS, GARMENT_LABELS, GARMENT_TYPES } from '@/lib/measurement-config'
-import { sortFieldsByOrder, getHiddenFields } from '@/lib/field-reordering'
+import { getHiddenFields } from '@/lib/field-reordering'
 import type { CustomerMeasurement, GarmentType, GarmentMeasurements } from '@/types'
 import { cn } from '@/lib/utils'
 
@@ -48,8 +48,6 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
   const [designPreviews, setDesignPreviews] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
-  const [fieldOrder, setFieldOrder] = useState<string[]>([])
-  const [draggedField, setDraggedField] = useState<string | null>(null)
   const [hiddenFields, setHiddenFields] = useState<string[]>([])
   const [showAddFields, setShowAddFields] = useState(false)
   const [editingLabel, setEditingLabel] = useState<string | null>(null)
@@ -72,10 +70,8 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
       setDueDate(editItem.dueDate || '')
       setPatternPreview(editItem.measurements.patternImageUrl || '')
       setDesignPreviews(editItem.measurements.designImageUrls || [])
-      // Load saved field order and hidden fields
-      const savedOrder = editItem.measurements.fieldOrder || []
+      // Load saved hidden fields
       const savedHidden = editItem.measurements.hiddenFields || []
-      setFieldOrder(savedOrder)
       setHiddenFields(savedHidden)
     } else {
       setLabel('')
@@ -85,26 +81,20 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
       setDueDate('')
       setPatternPreview('')
       setDesignPreviews([])
-      // Reset field order and hidden fields for new measurement
-      setFieldOrder([])
+      // Reset hidden fields for new measurement
       setHiddenFields([])
     }
     setPatternFile(null)
     setDesignFiles([])
     setUploadProgress(0)
-    setDraggedField(null)
     setShowAddFields(false)
     setEditingLabel(null)
     setFieldLabels({})
   }, [open, editItem])
 
-  // Initialize field order and hidden fields when garment type changes (for new measurements)
+  // Reset hidden fields when garment type changes (for new measurements)
   useEffect(() => {
     if (!open || editItem) return
-    const numericFields = GARMENT_FIELDS[garmentType]
-      .filter(f => f.type === 'number')
-      .map(f => String(f.key))
-    setFieldOrder(numericFields)
     setHiddenFields([]) // No hidden fields for new measurements
   }, [garmentType, open, editItem])
 
@@ -141,52 +131,12 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
     setDesignFiles(prev => prev.filter((_, i) => i !== index))
   }
 
-  function handleDragStart(e: React.DragEvent, fieldKey: string) {
-    setDraggedField(fieldKey)
-    e.dataTransfer.effectAllowed = 'move'
-  }
-
-  function handleDragOver(e: React.DragEvent) {
-    e.preventDefault()
-    e.dataTransfer.dropEffect = 'move'
-  }
-
-  function handleDrop(e: React.DragEvent, targetFieldKey: string) {
-    e.preventDefault()
-    if (!draggedField || draggedField === targetFieldKey) {
-      setDraggedField(null)
-      return
-    }
-
-    const draggedIdx = fieldOrder.indexOf(draggedField)
-    const targetIdx = fieldOrder.indexOf(targetFieldKey)
-
-    if (draggedIdx === -1 || targetIdx === -1) {
-      setDraggedField(null)
-      return
-    }
-
-    const newOrder = [...fieldOrder]
-    const [moved] = newOrder.splice(draggedIdx, 1)
-    newOrder.splice(targetIdx, 0, moved)
-    setFieldOrder(newOrder)
-    setDraggedField(null)
-  }
-
-  function handleDragEnd() {
-    setDraggedField(null)
-  }
-
   function hideField(fieldKey: string) {
     setHiddenFields(prev => [...prev, fieldKey])
   }
 
   function showField(fieldKey: string) {
     setHiddenFields(prev => prev.filter(k => k !== fieldKey))
-    // Add to end of field order
-    if (!fieldOrder.includes(fieldKey)) {
-      setFieldOrder(prev => [...prev, fieldKey])
-    }
   }
 
   function startEditingLabel(fieldKey: string, currentLabel: string) {
@@ -234,10 +184,6 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
         }
       }
       if (notes.trim()) measurements.notes = notes.trim()
-      // Save field order if custom order exists
-      if (fieldOrder.length > 0) {
-        measurements.fieldOrder = fieldOrder
-      }
       // Save hidden fields if any exist
       if (hiddenFields.length > 0) {
         measurements.hiddenFields = hiddenFields
@@ -420,28 +366,12 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
                   <span className="text-xs text-muted-foreground">inches</span>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {sortFieldsByOrder(fields.filter(f => f.type === 'number'), fieldOrder, hiddenFields).map(field => (
-                    <motion.div
+                  {fields.filter(f => f.type === 'number' && !hiddenFields.includes(String(f.key))).map(field => (
+                    <div
                       key={String(field.key)}
-                      layout
-                      draggable
-                      onDragStart={(e) => handleDragStart(e as any, String(field.key))}
-                      onDragOver={handleDragOver}
-                      onDrop={(e) => handleDrop(e as any, String(field.key))}
-                      onDragEnd={handleDragEnd}
-                      className={cn(
-                        'p-3 rounded-xl border-2 transition-all cursor-move group',
-                        draggedField === String(field.key)
-                          ? 'opacity-50 border-dashed border-foreground/30'
-                          : draggedField
-                          ? 'border-border opacity-80'
-                          : 'border-transparent hover:border-border/60'
-                      )}
+                      className="p-3 rounded-xl border border-border bg-background hover:border-muted-foreground transition-colors group"
                     >
                       <div className="flex items-center gap-2 mb-1">
-                        <div className="text-muted-foreground hover:text-foreground transition-colors cursor-grab active:cursor-grabbing p-1 -ml-1">
-                          <GripVertical size={14} />
-                        </div>
                         {editingLabel === String(field.key) ? (
                           <input
                             ref={editingInputRef}
@@ -484,7 +414,7 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
                           {unit}
                         </span>
                       </div>
-                    </motion.div>
+                    </div>
                   ))}
                 </div>
 
