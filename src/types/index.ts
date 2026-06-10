@@ -136,6 +136,8 @@ export interface GarmentMeasurements {
   halfBody?: number
   neckShape?: string
   totalItems?: number
+  fieldOrder?: string[]
+  hiddenFields?: string[]
   notes?: string
   patternImageUrl?: string
   designImageUrls?: string[]

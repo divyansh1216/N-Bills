@@ -34,13 +34,16 @@ export async function signInWithPin(phone: string, pin: string): Promise<AppUser
   return result.data
 }
 
-// Login using only PIN — fetches the first (and only) user and matches the PIN
+// Login using only PIN — find the user with matching PIN
 export async function signInWithPinOnly(pin: string): Promise<AppUser> {
   const snap = await getDocs(collection(db, USERS_COL))
   if (snap.empty) throw new Error('No account found. Please create an account first.')
-  const user = snap.docs[0].data() as AppUser
-  if (user.pin !== pin) throw new Error('Incorrect PIN. Please try again.')
-  return user
+  // Find the user with matching PIN (should be unique)
+  for (const doc of snap.docs) {
+    const user = doc.data() as AppUser
+    if (user.pin === pin) return user
+  }
+  throw new Error('Incorrect PIN. Please try again.')
 }
 
 export async function resetPin(phone: string, newPin: string): Promise<AppUser> {

@@ -2,11 +2,12 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Loader2, Image as ImageIcon, Plus, Trash2, Camera } from 'lucide-react'
+import { X, Loader2, Image as ImageIcon, Plus, Trash2, Camera, GripVertical, ChevronDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { addMeasurement, updateMeasurement } from '@/firebase/firestore'
 import { uploadMeasurementImage } from '@/lib/cloudinary'
-import { GARMENT_FIELDS, GARMENT_LABELS, GARMENT_TYPES, GARMENT_COLORS } from '@/lib/measurement-config'
+import { GARMENT_FIELDS, GARMENT_LABELS, GARMENT_TYPES } from '@/lib/measurement-config'
+import { sortFieldsByOrder, getHiddenFields } from '@/lib/field-reordering'
 import type { CustomerMeasurement, GarmentType, GarmentMeasurements } from '@/types'
 import { cn } from '@/lib/utils'
 
@@ -47,8 +48,15 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
   const [designPreviews, setDesignPreviews] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
+  const [fieldOrder, setFieldOrder] = useState<string[]>([])
+  const [draggedField, setDraggedField] = useState<string | null>(null)
+  const [hiddenFields, setHiddenFields] = useState<string[]>([])
+  const [showAddFields, setShowAddFields] = useState(false)
+  const [editingLabel, setEditingLabel] = useState<string | null>(null)
+  const [fieldLabels, setFieldLabels] = useState<Record<string, string>>({})
 
   const patternRef = useRef<HTMLInputElement>(null)
+  const editingInputRef = useRef<HTMLInputElement>(null)
   const patternCameraRef = useRef<HTMLInputElement>(null)
   const designRef = useRef<HTMLInputElement>(null)
   const designCameraRef = useRef<HTMLInputElement>(null)
@@ -64,6 +72,11 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
       setDueDate(editItem.dueDate || '')
       setPatternPreview(editItem.measurements.patternImageUrl || '')
       setDesignPreviews(editItem.measurements.designImageUrls || [])
+      // Load saved field order and hidden fields
+      const savedOrder = editItem.measurements.fieldOrder || []
+      const savedHidden = editItem.measurements.hiddenFields || []
+      setFieldOrder(savedOrder)
+      setHiddenFields(savedHidden)
     } else {
       setLabel('')
       setGarmentType('blouse')
@@ -72,11 +85,28 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
       setDueDate('')
       setPatternPreview('')
       setDesignPreviews([])
+      // Reset field order and hidden fields for new measurement
+      setFieldOrder([])
+      setHiddenFields([])
     }
     setPatternFile(null)
     setDesignFiles([])
     setUploadProgress(0)
+    setDraggedField(null)
+    setShowAddFields(false)
+    setEditingLabel(null)
+    setFieldLabels({})
   }, [open, editItem])
+
+  // Initialize field order and hidden fields when garment type changes (for new measurements)
+  useEffect(() => {
+    if (!open || editItem) return
+    const numericFields = GARMENT_FIELDS[garmentType]
+      .filter(f => f.type === 'number')
+      .map(f => String(f.key))
+    setFieldOrder(numericFields)
+    setHiddenFields([]) // No hidden fields for new measurements
+  }, [garmentType, open, editItem])
 
   const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 
@@ -111,6 +141,76 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
     setDesignFiles(prev => prev.filter((_, i) => i !== index))
   }
 
+  function handleDragStart(e: React.DragEvent, fieldKey: string) {
+    setDraggedField(fieldKey)
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+  }
+
+  function handleDrop(e: React.DragEvent, targetFieldKey: string) {
+    e.preventDefault()
+    if (!draggedField || draggedField === targetFieldKey) {
+      setDraggedField(null)
+      return
+    }
+
+    const draggedIdx = fieldOrder.indexOf(draggedField)
+    const targetIdx = fieldOrder.indexOf(targetFieldKey)
+
+    if (draggedIdx === -1 || targetIdx === -1) {
+      setDraggedField(null)
+      return
+    }
+
+    const newOrder = [...fieldOrder]
+    const [moved] = newOrder.splice(draggedIdx, 1)
+    newOrder.splice(targetIdx, 0, moved)
+    setFieldOrder(newOrder)
+    setDraggedField(null)
+  }
+
+  function handleDragEnd() {
+    setDraggedField(null)
+  }
+
+  function hideField(fieldKey: string) {
+    setHiddenFields(prev => [...prev, fieldKey])
+  }
+
+  function showField(fieldKey: string) {
+    setHiddenFields(prev => prev.filter(k => k !== fieldKey))
+    // Add to end of field order
+    if (!fieldOrder.includes(fieldKey)) {
+      setFieldOrder(prev => [...prev, fieldKey])
+    }
+  }
+
+  function startEditingLabel(fieldKey: string, currentLabel: string) {
+    setEditingLabel(fieldKey)
+    setFieldLabels(prev => ({ ...prev, [fieldKey]: currentLabel }))
+    setTimeout(() => editingInputRef.current?.focus(), 0)
+  }
+
+  function saveEditingLabel(fieldKey: string) {
+    setEditingLabel(null)
+  }
+
+  function getFieldLabel(field: any): string {
+    return fieldLabels[String(field.key)] ?? field.label
+  }
+
+  function handleLabelKeyDown(e: React.KeyboardEvent, fieldKey: string) {
+    if (e.key === 'Enter') {
+      saveEditingLabel(fieldKey)
+    } else if (e.key === 'Escape') {
+      setEditingLabel(null)
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!label.trim()) { toast.error('Enter a label for this measurement'); return }
@@ -134,6 +234,14 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
         }
       }
       if (notes.trim()) measurements.notes = notes.trim()
+      // Save field order if custom order exists
+      if (fieldOrder.length > 0) {
+        measurements.fieldOrder = fieldOrder
+      }
+      // Save hidden fields if any exist
+      if (hiddenFields.length > 0) {
+        measurements.hiddenFields = hiddenFields
+      }
 
       const totalUploads = (patternFile ? 1 : 0) + designFiles.length
       let done = 0
@@ -238,7 +346,7 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
   return (
     <AnimatePresence>
       {open && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div key="measurement-modal" className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -247,6 +355,7 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
             className="absolute inset-0 bg-black/50 backdrop-blur-sm"
           />
           <motion.div
+            key="modal-content"
             initial={{ opacity: 0, y: 40, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.97 }}
@@ -267,17 +376,28 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
             </div>
 
             <form onSubmit={handleSubmit} className="p-6 space-y-6">
-              {/* Label + Due Date row */}
-              <div className="grid grid-cols-2 gap-3">
+              {/* Garment Type + Due Date row */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Label *</label>
-                  <input
+                  <select
                     required
-                    value={label}
-                    onChange={e => setLabel(e.target.value)}
-                    placeholder="e.g. Wedding 2024, Casual"
+                    value={garmentType}
+                    onChange={e => {
+                      const type = e.target.value as GarmentType
+                      setGarmentType(type)
+                      setLabel(GARMENT_LABELS[type])
+                      setFieldValues(emptyFields())
+                    }}
                     className={inputClass}
-                  />
+                  >
+                    <option key="placeholder" value="">Select Garment Type</option>
+                    {GARMENT_TYPES.map(type => (
+                      <option key={type} value={type}>
+                        {GARMENT_LABELS[type]}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Due Date *</label>
@@ -291,28 +411,6 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
                 </div>
               </div>
 
-              {/* Garment type */}
-              <div>
-                <label className="text-xs font-medium text-muted-foreground mb-2 block">Garment Type</label>
-                <div className="flex flex-wrap gap-2">
-                  {GARMENT_TYPES.map(type => (
-                    <button
-                      key={type}
-                      type="button"
-                      onClick={() => { setGarmentType(type); setFieldValues(emptyFields()) }}
-                      className={cn(
-                        'px-3 py-1.5 rounded-xl text-xs font-medium border transition-all',
-                        garmentType === type
-                          ? 'bg-foreground text-background border-foreground'
-                          : 'bg-background border-border text-muted-foreground hover:text-foreground'
-                      )}
-                    >
-                      {GARMENT_LABELS[type]}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
               {/* Dynamic measurement fields */}
               <div>
                 <div className="flex items-center justify-between mb-3">
@@ -322,15 +420,62 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
                   <span className="text-xs text-muted-foreground">inches</span>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {fields.filter(f => f.type === 'number').map(field => (
-                    <div key={String(field.key)}>
-                      <label className="text-xs text-muted-foreground mb-1 block">{field.label}</label>
+                  {sortFieldsByOrder(fields.filter(f => f.type === 'number'), fieldOrder, hiddenFields).map(field => (
+                    <motion.div
+                      key={String(field.key)}
+                      layout
+                      draggable
+                      onDragStart={(e) => handleDragStart(e as any, String(field.key))}
+                      onDragOver={handleDragOver}
+                      onDrop={(e) => handleDrop(e as any, String(field.key))}
+                      onDragEnd={handleDragEnd}
+                      className={cn(
+                        'p-3 rounded-xl border-2 transition-all cursor-move group',
+                        draggedField === String(field.key)
+                          ? 'opacity-50 border-dashed border-foreground/30'
+                          : draggedField
+                          ? 'border-border opacity-80'
+                          : 'border-transparent hover:border-border/60'
+                      )}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <div className="text-muted-foreground hover:text-foreground transition-colors cursor-grab active:cursor-grabbing p-1 -ml-1">
+                          <GripVertical size={14} />
+                        </div>
+                        {editingLabel === String(field.key) ? (
+                          <input
+                            ref={editingInputRef}
+                            type="text"
+                            value={fieldLabels[String(field.key)] ?? field.label}
+                            onChange={e => setFieldLabels(prev => ({ ...prev, [String(field.key)]: e.target.value }))}
+                            onBlur={() => saveEditingLabel(String(field.key))}
+                            onKeyDown={e => handleLabelKeyDown(e, String(field.key))}
+                            className="text-xs bg-background border border-ring rounded px-2 py-1 flex-1 text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                          />
+                        ) : (
+                          <label
+                            onClick={() => startEditingLabel(String(field.key), field.label)}
+                            className="text-xs text-muted-foreground select-none flex-1 cursor-text hover:text-foreground transition-colors"
+                            title="Click to edit"
+                          >
+                            {getFieldLabel(field)}
+                          </label>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => hideField(String(field.key))}
+                          className="text-muted-foreground hover:text-destructive transition-colors p-1 -mr-1 opacity-0 group-hover:opacity-100"
+                          title="Hide field"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
                       <div className="relative">
                         <input
                           type="number"
                           min={0}
                           step="any"
-                          value={fieldValues[field.key] ?? ''}
+                          value={fieldValues[field.key as keyof GarmentMeasurements] ?? ''}
                           onChange={e => setFieldValues(prev => ({ ...prev, [field.key]: e.target.value }))}
                           placeholder={field.placeholder}
                           className={cn(inputClass, 'pr-8')}
@@ -339,7 +484,7 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
                           {unit}
                         </span>
                       </div>
-                    </div>
+                    </motion.div>
                   ))}
                 </div>
 
@@ -356,6 +501,54 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
                     />
                   </div>
                 ))}
+
+                {/* Add Fields Section */}
+                {getHiddenFields(fields.filter(f => f.type === 'number'), hiddenFields).length > 0 && (
+                  <div className="mt-4 pt-4 border-t border-border">
+                    <button
+                      type="button"
+                      onClick={() => setShowAddFields(!showAddFields)}
+                      className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-muted transition-colors text-sm font-medium text-muted-foreground hover:text-foreground"
+                    >
+                      <span className="flex items-center gap-2">
+                        <Plus size={14} />
+                        Add Fields ({getHiddenFields(fields.filter(f => f.type === 'number'), hiddenFields).length})
+                      </span>
+                      <ChevronDown
+                        size={16}
+                        className={cn(
+                          'transition-transform',
+                          showAddFields && 'rotate-180'
+                        )}
+                      />
+                    </button>
+
+                    <AnimatePresence>
+                      {showAddFields && (
+                        <motion.div
+                          key="add-fields-panel"
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="mt-2 space-y-1.5 overflow-hidden"
+                        >
+                          {getHiddenFields(fields.filter(f => f.type === 'number'), hiddenFields).map(field => (
+                            <button
+                              key={String(field.key)}
+                              type="button"
+                              onClick={() => showField(String(field.key))}
+                              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 hover:bg-muted text-sm text-foreground transition-colors text-left group"
+                            >
+                              <Plus size={14} className="text-muted-foreground group-hover:text-foreground transition-colors" />
+                              <span>{field.label}</span>
+                            </button>
+                          ))}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                )}
               </div>
 
               {/* Notes */}

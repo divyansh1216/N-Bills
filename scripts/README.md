@@ -104,10 +104,12 @@ node restore.js backups/firestore-backup-2024-01-15-10-30-00.json
 | Arrays, maps, booleans, numbers, null | Stored as-is |
 
 ---
-
+<!-- For Backup Commands -->
 ## npm shortcuts
-
+cd scripts /
 ```bash
 npm run backup    # same as: node backup.js
 npm run restore   # same as: node restore.js
 ```
+
+
