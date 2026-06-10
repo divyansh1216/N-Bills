@@ -365,9 +365,9 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
                           onClick={() => setShowAddFields(true)}
                           whileHover={{ scale: 1.02 }}
                           whileTap={{ scale: 0.98 }}
-                          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg font-medium text-sm hover:opacity-90 transition-all"
+                          className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-primary text-primary-foreground rounded-lg font-medium text-xs hover:opacity-90 transition-all"
                         >
-                          <Plus size={16} />
+                          <Plus size={14} />
                           Add Fields
                         </motion.button>
                       )}
