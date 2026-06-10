@@ -81,8 +81,11 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
       setDueDate('')
       setPatternPreview('')
       setDesignPreviews([])
-      // Reset hidden fields for new measurement
-      setHiddenFields([])
+      // For new measurement, hide ALL fields by default (user must add them)
+      const allNumericFieldKeys = GARMENT_FIELDS['blouse']
+        .filter(f => f.type === 'number')
+        .map(f => String(f.key))
+      setHiddenFields(allNumericFieldKeys)
     }
     setPatternFile(null)
     setDesignFiles([])
@@ -92,10 +95,14 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
     setFieldLabels({})
   }, [open, editItem])
 
-  // Reset hidden fields when garment type changes (for new measurements)
+  // Update hidden fields when garment type changes (for new measurements)
   useEffect(() => {
     if (!open || editItem) return
-    setHiddenFields([]) // No hidden fields for new measurements
+    // Hide all fields for new measurement when garment type changes
+    const allNumericFieldKeys = GARMENT_FIELDS[garmentType]
+      .filter(f => f.type === 'number')
+      .map(f => String(f.key))
+    setHiddenFields(allNumericFieldKeys)
   }, [garmentType, open, editItem])
 
   const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
