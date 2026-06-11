@@ -7,7 +7,6 @@ import { toast } from 'sonner'
 import { addMeasurement, updateMeasurement } from '@/firebase/firestore'
 import { uploadMeasurementImage } from '@/lib/cloudinary'
 import { GARMENT_FIELDS, GARMENT_LABELS, GARMENT_TYPES } from '@/lib/measurement-config'
-import { getHiddenFields } from '@/lib/field-reordering'
 import type { CustomerMeasurement, GarmentType, GarmentMeasurements } from '@/types'
 import { cn } from '@/lib/utils'
 
@@ -47,7 +46,6 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
   const [loading, setLoading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [hiddenFields, setHiddenFields] = useState<string[]>([])
-  const [showAddFields, setShowAddFields] = useState(false)
   const [editingLabel, setEditingLabel] = useState<string | null>(null)
   const [fieldLabels, setFieldLabels] = useState<Record<string, string>>({})
 
@@ -69,33 +67,26 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
       const savedHidden = editItem.measurements.hiddenFields || []
       setHiddenFields(savedHidden)
     } else {
-      setLabel('')
+      setLabel(GARMENT_LABELS['blouse'])
       setGarmentType('blouse')
       setFieldValues(emptyFields())
       setNotes('')
       setDueDate('')
       setDesignPreviews([])
-      // For new measurement, hide ALL fields by default (user must add them)
-      const allNumericFieldKeys = GARMENT_FIELDS['blouse']
-        .filter(f => f.type === 'number')
-        .map(f => String(f.key))
-      setHiddenFields(allNumericFieldKeys)
+      // Show all fields by default for new measurement
+      setHiddenFields([])
     }
     setDesignFiles([])
     setUploadProgress(0)
-    setShowAddFields(false)
     setEditingLabel(null)
     setFieldLabels({})
   }, [open, editItem])
 
-  // Update hidden fields when garment type changes (for new measurements)
+  // Reset hidden fields when garment type changes (for new measurements)
   useEffect(() => {
     if (!open || editItem) return
-    // Hide all fields for new measurement when garment type changes
-    const allNumericFieldKeys = GARMENT_FIELDS[garmentType]
-      .filter(f => f.type === 'number')
-      .map(f => String(f.key))
-    setHiddenFields(allNumericFieldKeys)
+    // Show all fields for new measurement when garment type changes
+    setHiddenFields([])
   }, [garmentType, open, editItem])
 
   const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
@@ -117,14 +108,6 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
   function removeDesign(index: number) {
     setDesignPreviews(prev => prev.filter((_, i) => i !== index))
     setDesignFiles(prev => prev.filter((_, i) => i !== index))
-  }
-
-  function hideField(fieldKey: string) {
-    setHiddenFields(prev => [...prev, fieldKey])
-  }
-
-  function showField(fieldKey: string) {
-    setHiddenFields(prev => prev.filter(k => k !== fieldKey))
   }
 
   function startEditingLabel(fieldKey: string, currentLabel: string) {
@@ -172,10 +155,6 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
         }
       }
       if (notes.trim()) measurements.notes = notes.trim()
-      // Save hidden fields if any exist
-      if (hiddenFields.length > 0) {
-        measurements.hiddenFields = hiddenFields
-      }
 
       const totalUploads = designFiles.length
       let done = 0
@@ -305,18 +284,21 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
                   <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Label *</label>
                   <select
                     required
-                    value={garmentType}
+                    value={label}
                     onChange={e => {
-                      const type = e.target.value as GarmentType
+                      const selectedLabel = e.target.value
+                      setLabel(selectedLabel)
+                      // Find the garment type that matches this label
+                      const type = GARMENT_TYPES.find(t => GARMENT_LABELS[t] === selectedLabel) || 'blouse'
                       setGarmentType(type)
-                      setLabel(GARMENT_LABELS[type])
                       setFieldValues(emptyFields())
+                      setHiddenFields([])
                     }}
                     className={inputClass}
                   >
                     <option key="placeholder" value="">Select Garment Type</option>
                     {GARMENT_TYPES.map(type => (
-                      <option key={type} value={type}>
+                      <option key={type} value={GARMENT_LABELS[type]}>
                         {GARMENT_LABELS[type]}
                       </option>
                     ))}
@@ -342,75 +324,6 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
                   </label>
                   <span className="text-xs text-muted-foreground">inches</span>
                 </div>
-
-                {/* Add Fields Section - Prominent Display */}
-                {getHiddenFields(fields.filter(f => f.type === 'number'), hiddenFields).length > 0 && (
-                  <div className="mb-4 p-4 rounded-xl bg-gradient-to-r from-primary/5 to-primary/10 border border-primary/30 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-1">
-                        <p className="text-sm font-semibold text-foreground">Select Measurement Fields</p>
-                        <p className="text-xs text-muted-foreground">Choose which fields you want to measure for this garment</p>
-                      </div>
-                      <div className="text-right">
-                        <span className="inline-block px-2 py-1 rounded-lg bg-primary/20 text-primary text-xs font-medium">
-                          {getHiddenFields(fields.filter(f => f.type === 'number'), hiddenFields).length} available
-                        </span>
-                      </div>
-                    </div>
-
-                    <AnimatePresence>
-                      {!showAddFields && (
-                        <motion.button
-                          type="button"
-                          onClick={() => setShowAddFields(true)}
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                          className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-primary text-primary-foreground rounded-lg font-medium text-xs hover:opacity-90 transition-all"
-                        >
-                          <Plus size={14} />
-                          Add Fields
-                        </motion.button>
-                      )}
-                    </AnimatePresence>
-
-                    <AnimatePresence>
-                      {showAddFields && (
-                        <motion.div
-                          key="add-fields-list"
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: 'auto' }}
-                          exit={{ opacity: 0, height: 0 }}
-                          transition={{ duration: 0.2 }}
-                          className="grid grid-cols-2 sm:grid-cols-3 gap-2 overflow-hidden"
-                        >
-                          {getHiddenFields(fields.filter(f => f.type === 'number'), hiddenFields).map(field => (
-                            <motion.button
-                              key={String(field.key)}
-                              type="button"
-                              onClick={() => showField(String(field.key))}
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
-                              className="px-3 py-2 rounded-lg bg-background border border-primary/40 hover:border-primary hover:bg-primary/5 text-foreground text-xs font-medium transition-all duration-200"
-                            >
-                              <Plus size={12} className="inline mr-1" />
-                              {field.label}
-                            </motion.button>
-                          ))}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-
-                    {showAddFields && (
-                      <button
-                        type="button"
-                        onClick={() => setShowAddFields(false)}
-                        className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors py-1"
-                      >
-                        Hide fields
-                      </button>
-                    )}
-                  </div>
-                )}
 
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {fields.filter(f => f.type === 'number' && !hiddenFields.includes(String(f.key))).map(field => (
@@ -438,14 +351,6 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
                             {getFieldLabel(field)}
                           </label>
                         )}
-                        <button
-                          type="button"
-                          onClick={() => hideField(String(field.key))}
-                          className="text-muted-foreground hover:text-destructive transition-colors p-1 -mr-1 opacity-0 group-hover:opacity-100"
-                          title="Hide field"
-                        >
-                          <X size={14} />
-                        </button>
                       </div>
                       <div className="relative">
                         <input
