@@ -263,13 +263,13 @@ export default function LoginForm() {
                   >
                     Forgot PIN?
                   </button>
-                  <button
+                  {/* <button
                     type="button"
                     onClick={() => resetMode('signup')}
                     className="hover:text-foreground transition-colors"
                   >
                     Create account
-                  </button>
+                  </button> */}
                 </div>
               </motion.div>
             )}
@@ -319,7 +319,7 @@ export default function LoginForm() {
                     placeholder="repeat PIN"
                   />
 
-                  <motion.button
+                  {/* <motion.button
                     type="submit"
                     disabled={loading || !name.trim() || phone.length < 10 || pin.length < 4}
                     whileHover={{ scale: 1.01 }}
@@ -328,7 +328,7 @@ export default function LoginForm() {
                   >
                     {loading && <Loader2 size={16} className="animate-spin" />}
                     Create account
-                  </motion.button>
+                  </motion.button> */}
                 </form>
 
                 <div className="mt-6 text-center">
