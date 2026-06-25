@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, Search, Download, Edit2, Trash2, Ruler, ChevronRight, Eye, X, CalendarClock } from 'lucide-react'
 import { toast } from 'sonner'
-import { getCustomerMeasurements, deleteMeasurement } from '@/firebase/firestore'
+import { getCustomerMeasurements, deleteMeasurement, updateMeasurement } from '@/firebase/firestore'
 import { generateMeasurementPDF } from '@/lib/measurement-pdf'
 import { GARMENT_LABELS, GARMENT_COLORS, GARMENT_TYPES, GARMENT_FIELDS, getPreviewFields } from '@/lib/measurement-config'
 import { useShopSettings } from '@/contexts/ShopSettingsContext'
@@ -28,6 +28,37 @@ function fmtDate(val: any): string {
   const iso = safeDate(val)
   if (!iso) return '—'
   return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+function StatusSwitch({
+  checked,
+  label,
+  onChange,
+}: {
+  checked: boolean
+  label: string
+  onChange: (checked: boolean) => void
+}) {
+  return (
+    <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground cursor-pointer select-none">
+      <span>{label}</span>
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={e => onChange(e.target.checked)}
+        className="sr-only"
+      />
+      <span className={cn(
+        'relative h-5 w-9 rounded-full border transition-colors',
+        checked ? 'bg-primary border-primary' : 'bg-muted border-border'
+      )}>
+        <span className={cn(
+          'absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-background shadow-sm transition-transform',
+          checked && 'translate-x-4'
+        )} />
+      </span>
+    </label>
+  )
 }
 
 export default function MeasurementTab({ customerId, customerName }: Props) {
@@ -81,6 +112,17 @@ export default function MeasurementTab({ customerId, customerName }: Props) {
       toast.error('Failed to delete')
     }
     setConfirmDelete(null)
+  }
+
+  async function handleStatusChange(id: string, field: 'isPaid' | 'isDone', value: boolean) {
+    const previous = measurements
+    setMeasurements(prev => prev.map(m => (m.id === id ? { ...m, [field]: value } : m)))
+    try {
+      await updateMeasurement(id, { [field]: value })
+    } catch {
+      setMeasurements(previous)
+      toast.error('Failed to update status')
+    }
   }
 
   async function handlePDF(m: CustomerMeasurement) {
@@ -220,7 +262,7 @@ export default function MeasurementTab({ customerId, customerName }: Props) {
                     <div className="flex-1 min-w-0">
                       <h4 className="text-sm font-semibold text-foreground">{m.label}</h4>
                       <span className="text-xs text-muted-foreground mt-1 block">{fmtDate(m.createdAt)}</span>
-                      {m.dueDate && (
+                      {m.dueDate && !m.isDone && (
                         <div className={cn(
                           'flex items-center gap-1 mt-1.5 text-xs font-medium px-2 py-0.5 rounded-md w-fit',
                           new Date(m.dueDate) < new Date()
@@ -337,71 +379,99 @@ export default function MeasurementTab({ customerId, customerName }: Props) {
 
                   {/* Actions - shown only when collapsed */}
                   {!isExpanded && (
-                    <div className="px-4 py-3 border-t border-border flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => setViewItem(m)}
-                        title="View"
-                        className="p-2 text-muted-foreground hover:text-foreground rounded-xl hover:bg-muted transition-colors"
-                      >
-                        <Eye size={14} />
-                      </button>
-                      <button
-                        onClick={() => handlePDF(m)}
-                        disabled={pdfLoading === m.id}
-                        title="Download PDF"
-                        className="p-2 text-muted-foreground hover:text-foreground rounded-xl hover:bg-muted transition-colors disabled:opacity-50"
-                      >
-                        <Download size={14} />
-                      </button>
-                      <button
-                        onClick={() => { setEditItem(m); setModalOpen(true) }}
-                        title="Edit"
-                        className="p-2 text-muted-foreground hover:text-foreground rounded-xl hover:bg-muted transition-colors"
-                      >
-                        <Edit2 size={14} />
-                      </button>
-                      <button
-                        onClick={() => setConfirmDelete(m.id)}
-                        title="Delete"
-                        className="p-2 text-muted-foreground hover:text-red-500 rounded-xl hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                    <div className="px-4 py-3 border-t border-border flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <StatusSwitch
+                          checked={Boolean(m.isPaid)}
+                          label="Paid"
+                          onChange={checked => handleStatusChange(m.id, 'isPaid', checked)}
+                        />
+                        <StatusSwitch
+                          checked={Boolean(m.isDone)}
+                          label="Done"
+                          onChange={checked => handleStatusChange(m.id, 'isDone', checked)}
+                        />
+                      </div>
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => setViewItem(m)}
+                          title="View"
+                          className="p-2 text-muted-foreground hover:text-foreground rounded-xl hover:bg-muted transition-colors"
+                        >
+                          <Eye size={14} />
+                        </button>
+                        <button
+                          onClick={() => handlePDF(m)}
+                          disabled={pdfLoading === m.id}
+                          title="Download PDF"
+                          className="p-2 text-muted-foreground hover:text-foreground rounded-xl hover:bg-muted transition-colors disabled:opacity-50"
+                        >
+                          <Download size={14} />
+                        </button>
+                        <button
+                          onClick={() => { setEditItem(m); setModalOpen(true) }}
+                          title="Edit"
+                          className="p-2 text-muted-foreground hover:text-foreground rounded-xl hover:bg-muted transition-colors"
+                        >
+                          <Edit2 size={14} />
+                        </button>
+                        <button
+                          onClick={() => setConfirmDelete(m.id)}
+                          title="Delete"
+                          className="p-2 text-muted-foreground hover:text-red-500 rounded-xl hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     </div>
                   )}
 
                   {/* Actions - shown when expanded */}
                   {isExpanded && (
-                    <div className="px-4 py-3 border-t border-border flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => setViewItem(m)}
-                        title="View"
-                        className="p-2 text-muted-foreground hover:text-foreground rounded-xl hover:bg-muted transition-colors"
-                      >
-                        <Eye size={14} />
-                      </button>
-                      <button
-                        onClick={() => handlePDF(m)}
-                        disabled={pdfLoading === m.id}
-                        title="Download PDF"
-                        className="p-2 text-muted-foreground hover:text-foreground rounded-xl hover:bg-muted transition-colors disabled:opacity-50"
-                      >
-                        <Download size={14} />
-                      </button>
-                      <button
-                        onClick={() => { setEditItem(m); setModalOpen(true) }}
-                        title="Edit"
-                        className="p-2 text-muted-foreground hover:text-foreground rounded-xl hover:bg-muted transition-colors"
-                      >
-                        <Edit2 size={14} />
-                      </button>
-                      <button
-                        onClick={() => setConfirmDelete(m.id)}
-                        title="Delete"
-                        className="p-2 text-muted-foreground hover:text-red-500 rounded-xl hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                    <div className="px-4 py-3 border-t border-border flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <StatusSwitch
+                          checked={Boolean(m.isPaid)}
+                          label="Paid"
+                          onChange={checked => handleStatusChange(m.id, 'isPaid', checked)}
+                        />
+                        <StatusSwitch
+                          checked={Boolean(m.isDone)}
+                          label="Done"
+                          onChange={checked => handleStatusChange(m.id, 'isDone', checked)}
+                        />
+                      </div>
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => setViewItem(m)}
+                          title="View"
+                          className="p-2 text-muted-foreground hover:text-foreground rounded-xl hover:bg-muted transition-colors"
+                        >
+                          <Eye size={14} />
+                        </button>
+                        <button
+                          onClick={() => handlePDF(m)}
+                          disabled={pdfLoading === m.id}
+                          title="Download PDF"
+                          className="p-2 text-muted-foreground hover:text-foreground rounded-xl hover:bg-muted transition-colors disabled:opacity-50"
+                        >
+                          <Download size={14} />
+                        </button>
+                        <button
+                          onClick={() => { setEditItem(m); setModalOpen(true) }}
+                          title="Edit"
+                          className="p-2 text-muted-foreground hover:text-foreground rounded-xl hover:bg-muted transition-colors"
+                        >
+                          <Edit2 size={14} />
+                        </button>
+                        <button
+                          onClick={() => setConfirmDelete(m.id)}
+                          title="Delete"
+                          className="p-2 text-muted-foreground hover:text-red-500 rounded-xl hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     </div>
                   )}
                 </motion.div>
@@ -442,7 +512,7 @@ export default function MeasurementTab({ customerId, customerName }: Props) {
                   </div>
                   <h3 className="text-base font-semibold text-foreground">{viewItem.label}</h3>
                   <p className="text-xs text-muted-foreground mt-0.5">{fmtDate(viewItem.createdAt)}</p>
-                  {viewItem.dueDate && (
+                  {viewItem.dueDate && !viewItem.isDone && (
                     <div className={cn(
                       'flex items-center gap-1 mt-1.5 text-xs font-medium px-2 py-0.5 rounded-md w-fit',
                       new Date(viewItem.dueDate) < new Date()

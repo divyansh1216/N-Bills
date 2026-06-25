@@ -4,6 +4,7 @@ import { ThemeProvider } from 'next-themes'
 import { Toaster } from 'sonner'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { ShopSettingsProvider } from '@/contexts/ShopSettingsContext'
+import MeasurementDueNotifications from '@/components/notifications/MeasurementDueNotifications'
 import './globals.css'
 
 const geistSans = localFont({
@@ -42,6 +43,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
           <ShopSettingsProvider>
             <AuthProvider>
+              <MeasurementDueNotifications />
               {children}
             </AuthProvider>
           </ShopSettingsProvider>

@@ -174,6 +174,8 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
           garmentType,
           unit,
           measurements,
+          isPaid: false,
+          isDone: false,
           ...(dueDate ? { dueDate } : {}),
         })
         docId = ref.id
@@ -211,6 +213,8 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
           garmentType,
           unit,
           measurements,
+          isPaid: editItem?.isPaid,
+          isDone: editItem?.isDone,
           dueDate: dueDate || undefined,
           updatedAt: new Date().toISOString(),
         }
@@ -225,6 +229,8 @@ export default function AddMeasurementModal({ open, onClose, customerId, custome
           garmentType,
           unit,
           measurements,
+          isPaid: false,
+          isDone: false,
           dueDate: dueDate || undefined,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),

@@ -151,6 +151,8 @@ export interface CustomerMeasurement {
   unit: MeasurementUnit
   measurements: GarmentMeasurements
   dueDate?: string
+  isPaid?: boolean
+  isDone?: boolean
   createdAt: any
   updatedAt: any
 }

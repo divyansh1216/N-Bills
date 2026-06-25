@@ -3,13 +3,13 @@
 import { useMemo } from 'react'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
-import { IndianRupee, Users, Shirt, FileText, ChevronRight, AlertCircle } from 'lucide-react'
+import { IndianRupee, Users, Shirt, FileText, ChevronRight, AlertCircle, CircleDollarSign } from 'lucide-react'
 import Header from '@/components/layout/Header'
 import StatCard from '@/components/dashboard/StatCard'
 import { StatCardSkeleton, Skeleton, TableRowSkeleton } from '@/components/ui/skeleton'
 import { useFirestoreCollection } from '@/hooks/useFirestoreCollection'
 import { orderBy } from 'firebase/firestore'
-import type { Invoice, Customer, Rental } from '@/types'
+import type { Invoice, Customer, Rental, CustomerMeasurement } from '@/types'
 import { useShopSettings } from '@/contexts/ShopSettingsContext'
 import { formatCurrency, formatDate, toDate } from '@/lib/formatters'
 import { STATUS_COLORS } from '@/lib/constants'
@@ -20,8 +20,9 @@ export default function DashboardPage() {
   const { data: invoices, loading: invLoading } = useFirestoreCollection<Invoice>('invoices', [orderBy('createdAt', 'desc')])
   const { data: customers, loading: custLoading } = useFirestoreCollection<Customer>('customers')
   const { data: rentals, loading: rentLoading } = useFirestoreCollection<Rental>('rentals')
+  const { data: measurements, loading: measurementLoading } = useFirestoreCollection<CustomerMeasurement>('measurements')
 
-  const loading = invLoading || custLoading || rentLoading
+  const loading = invLoading || custLoading || rentLoading || measurementLoading
 
   const stats = useMemo(() => {
     const now = new Date()
@@ -66,8 +67,22 @@ export default function DashboardPage() {
       ? ((pendingBills - lastPending) / lastPending) * 100
       : 0
 
-    return { thisMonthRevenue, revenueChange, customers: customers.length, customerChange, activeRentals, rentalChange, pendingBills, pendingChange }
-  }, [invoices, customers, rentals])
+    const paidMeasurementOrders = measurements.filter(m => m.isPaid).length
+    const unpaidMeasurementOrders = measurements.filter(m => !m.isPaid).length
+
+    return {
+      thisMonthRevenue,
+      revenueChange,
+      customers: customers.length,
+      customerChange,
+      activeRentals,
+      rentalChange,
+      pendingBills,
+      pendingChange,
+      paidMeasurementOrders,
+      unpaidMeasurementOrders,
+    }
+  }, [invoices, customers, rentals, measurements])
 
   const recentInvoices = invoices.slice(0, 8)
   const recentCustomers = customers.slice(0, 5)
@@ -85,15 +100,17 @@ export default function DashboardPage() {
       <div className="p-4 md:p-6 space-y-5 max-w-6xl mx-auto">
 
         {/* Stat cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
           {loading ? (
-            Array.from({ length: 4 }).map((_, i) => <StatCardSkeleton key={i} />)
+            Array.from({ length: 6 }).map((_, i) => <StatCardSkeleton key={i} />)
           ) : (
             <>
               <StatCard label="This Month" value={stats.thisMonthRevenue} change={stats.revenueChange} icon={IndianRupee} delay={0} format={v => formatCurrency(v)} />
               <StatCard label="Customers" value={stats.customers} change={stats.customerChange} icon={Users} delay={0.06} />
-              {rentalEnabled && <StatCard label="Active Rentals" value={stats.activeRentals} change={stats.rentalChange} icon={Shirt} delay={0.12} />}
-              <StatCard label="Pending Bills" value={stats.pendingBills} change={stats.pendingChange} icon={FileText} delay={0.18} />
+              <StatCard label="Paid Orders" value={stats.paidMeasurementOrders} change={0} changeLabel="measurement orders" icon={CircleDollarSign} delay={0.12} />
+              <StatCard label="Unpaid Orders" value={stats.unpaidMeasurementOrders} change={0} changeLabel="measurement orders" icon={AlertCircle} delay={0.18} />
+              {rentalEnabled && <StatCard label="Active Rentals" value={stats.activeRentals} change={stats.rentalChange} icon={Shirt} delay={0.24} />}
+              <StatCard label="Pending Bills" value={stats.pendingBills} change={stats.pendingChange} icon={FileText} delay={0.3} />
             </>
           )}
         </div>

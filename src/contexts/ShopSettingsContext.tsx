@@ -10,12 +10,14 @@ export interface ShopSettings {
   phone?: string
   address?: string
   rentalEnabled: boolean
+  notificationEnabled: boolean
 }
 
 const DEFAULTS: ShopSettings = {
   name: 'My Shop',
   tagline: 'Stitching & Rental Management',
   rentalEnabled: true,
+  notificationEnabled: false,
 }
 
 interface ShopCtx extends ShopSettings {
@@ -42,6 +44,7 @@ export function ShopSettingsProvider({ children }: { children: React.ReactNode }
             ...prev,
             ...data,
             rentalEnabled: data.rentalEnabled ?? true,
+            notificationEnabled: data.notificationEnabled ?? false,
           }))
         }
       })

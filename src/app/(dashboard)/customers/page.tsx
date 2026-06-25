@@ -10,17 +10,20 @@ import Header from '@/components/layout/Header'
 import { TableRowSkeleton } from '@/components/ui/skeleton'
 import { useFirestoreCollection } from '@/hooks/useFirestoreCollection'
 import { addCustomer } from '@/firebase/firestore'
-import { formatCurrency, formatDate } from '@/lib/formatters'
+import { formatDate } from '@/lib/formatters'
 import { TIER_COLORS, TIER_LABELS } from '@/lib/constants'
 import { useDebounce } from '@/hooks/useDebounce'
 import { AnimatePresence } from 'framer-motion'
 import type { Customer } from '@/types'
 import { cn } from '@/lib/utils'
 
+type WorkFilter = 'all' | 'pending' | 'paid' | 'unpaid' | 'done'
+
 export default function CustomersPage() {
   const { data: customers, loading } = useFirestoreCollection<Customer>('customers', [orderBy('totalSpent', 'desc')])
-  const { data: measurements } = useFirestoreCollection<{ customerId: string; dueDate?: string }>('measurements')
+  const { data: measurements } = useFirestoreCollection<{ customerId: string; dueDate?: string; isDone?: boolean; isPaid?: boolean }>('measurements')
   const [search, setSearch] = useState('')
+  const [workFilter, setWorkFilter] = useState<WorkFilter>('all')
   const [addModalOpen, setAddModalOpen] = useState(false)
   const debouncedSearch = useDebounce(search, 250)
 
@@ -28,6 +31,7 @@ export default function CustomersPage() {
   const nearestDueMap = useMemo(() => {
     const map: Record<string, string> = {}
     for (const m of measurements) {
+      if (m.isDone) continue
       if (!m.dueDate || !m.customerId) continue
       const d = new Date(m.dueDate)
       const existing = map[m.customerId]
@@ -38,11 +42,56 @@ export default function CustomersPage() {
     return map
   }, [measurements])
 
+  const customerWorkMap = useMemo(() => {
+    const map: Record<string, { pending: boolean; paid: boolean; unpaid: boolean; done: boolean }> = {}
+
+    for (const m of measurements) {
+      if (!m.customerId) continue
+      const entry = map[m.customerId] || { pending: false, paid: false, unpaid: false, done: false }
+      if (m.isDone) entry.done = true
+      if (!m.isDone && m.dueDate) entry.pending = true
+      if (m.isPaid) entry.paid = true
+      if (!m.isPaid) entry.unpaid = true
+      map[m.customerId] = entry
+    }
+
+    return map
+  }, [measurements])
+
+  const workStats = useMemo(() => {
+    const pendingCustomerIds = new Set<string>()
+    let pendingWork = 0
+    let doneWork = 0
+    let paidWork = 0
+    let unpaidWork = 0
+
+    for (const m of measurements) {
+      if (m.isDone) {
+        doneWork++
+      } else if (m.dueDate) {
+        pendingWork++
+        if (m.customerId) pendingCustomerIds.add(m.customerId)
+      }
+
+      if (m.isPaid) paidWork++
+      else unpaidWork++
+    }
+
+    return {
+      pendingCustomers: pendingCustomerIds.size,
+      pendingWork,
+      doneWork,
+      paidWork,
+      unpaidWork,
+    }
+  }, [measurements])
+
   const filtered = useMemo(() => {
     const base = customers.filter(c =>
-      !debouncedSearch ||
-      c.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-      (c.phone && c.phone.includes(debouncedSearch))
+      (!debouncedSearch ||
+        c.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+        (c.phone && c.phone.includes(debouncedSearch))) &&
+      (workFilter === 'all' || Boolean(customerWorkMap[c.id]?.[workFilter]))
     )
     // Sort: customers with a nearest due date come first (soonest first), rest after
     return [...base].sort((a, b) => {
@@ -53,7 +102,7 @@ export default function CustomersPage() {
       if (db_) return 1
       return 0
     })
-  }, [customers, debouncedSearch, nearestDueMap])
+  }, [customers, debouncedSearch, nearestDueMap, workFilter, customerWorkMap])
 
   return (
     <div>
@@ -61,12 +110,13 @@ export default function CustomersPage() {
       <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-6">
 
         {/* Stats row */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
           {[
             { label: 'Total Customers', value: customers.length },
-            { label: 'Platinum', value: customers.filter(c => c.tier === 'platinum').length },
-            { label: 'Gold', value: customers.filter(c => c.tier === 'gold').length },
-            { label: 'Avg. Spend', value: customers.length ? formatCurrency(customers.reduce((s, c) => s + c.totalSpent, 0) / customers.length) : '—' },
+            { label: 'Pending Orders', value: workStats.pendingWork },
+            { label: 'Paid Orders', value: workStats.paidWork },
+            { label: 'Unpaid Orders', value: workStats.unpaidWork },
+            { label: 'Orders Completed', value: workStats.doneWork },
           ].map(stat => (
             <div key={stat.label} className="bg-card border border-border rounded-xl p-4 luxury-shadow">
               <p className="text-xs text-muted-foreground mb-1">{stat.label}</p>
@@ -95,6 +145,30 @@ export default function CustomersPage() {
             <Plus size={16} />
             <span className="hidden sm:inline">Add Customer</span>
           </motion.button>
+        </div>
+
+        {/* Work filter */}
+        <div className="flex flex-wrap gap-2">
+          {([
+            { value: 'all', label: 'All' },
+            { value: 'pending', label: 'Pending' },
+            { value: 'paid', label: 'Paid' },
+            { value: 'unpaid', label: 'Unpaid' },
+            { value: 'done', label: 'Done' },
+          ] as { value: WorkFilter; label: string }[]).map(option => (
+            <button
+              key={option.value}
+              onClick={() => setWorkFilter(option.value)}
+              className={cn(
+                'px-3 py-1.5 rounded-xl text-xs font-medium border transition-all',
+                workFilter === option.value
+                  ? 'bg-foreground text-background border-foreground'
+                  : 'bg-card border-border text-muted-foreground hover:text-foreground'
+              )}
+            >
+              {option.label}
+            </button>
+          ))}
         </div>
 
         {/* Table */}

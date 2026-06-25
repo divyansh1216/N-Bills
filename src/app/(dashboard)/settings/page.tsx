@@ -2,17 +2,18 @@
 
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Loader2, Save, Store, Shirt } from 'lucide-react'
+import { Bell, Loader2, Save, Store, Shirt } from 'lucide-react'
 import { toast } from 'sonner'
 import Header from '@/components/layout/Header'
 import { useShopSettings } from '@/contexts/ShopSettingsContext'
 import { cn } from '@/lib/utils'
 
 export default function SettingsPage() {
-  const { name, tagline, phone, address, rentalEnabled, loading, save } = useShopSettings()
+  const { name, tagline, phone, address, rentalEnabled, notificationEnabled, loading, save } = useShopSettings()
   const [form, setForm] = useState({ name: '', tagline: '', phone: '', address: '' })
   const [saving, setSaving] = useState(false)
   const [togglingRental, setTogglingRental] = useState(false)
+  const [togglingNotification, setTogglingNotification] = useState(false)
 
   useEffect(() => {
     if (!loading) {
@@ -48,6 +49,36 @@ export default function SettingsPage() {
       toast.error('Failed to update setting')
     } finally {
       setTogglingRental(false)
+    }
+  }
+
+  async function handleNotificationToggle() {
+    setTogglingNotification(true)
+    try {
+      const nextEnabled = !notificationEnabled
+
+      if (nextEnabled) {
+        if (!('Notification' in window)) {
+          toast.error('Notifications are not supported on this device')
+          return
+        }
+
+        const permission = Notification.permission === 'granted'
+          ? 'granted'
+          : await Notification.requestPermission()
+
+        if (permission !== 'granted') {
+          toast.error('Allow notifications from your browser settings to enable reminders')
+          return
+        }
+      }
+
+      await save({ notificationEnabled: nextEnabled })
+      toast.success(nextEnabled ? 'Measurement reminders enabled' : 'Measurement reminders disabled')
+    } catch {
+      toast.error('Failed to update notification setting')
+    } finally {
+      setTogglingNotification(false)
     }
   }
 
@@ -171,40 +202,80 @@ export default function SettingsPage() {
                 <Loader2 size={18} className="animate-spin text-muted-foreground" />
               </div>
             ) : (
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center shrink-0">
-                    <Shirt size={16} className="text-foreground" />
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center shrink-0">
+                      <Shirt size={16} className="text-foreground" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Rental Outfits</p>
+                      <p className="text-xs text-muted-foreground">
+                        {rentalEnabled
+                          ? 'Rentals section, rental invoices, and rental fields are visible'
+                          : 'All rental features are hidden across the app'}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-medium text-foreground">Rental Outfits</p>
-                    <p className="text-xs text-muted-foreground">
-                      {rentalEnabled
-                        ? 'Rentals section, rental invoices, and rental fields are visible'
-                        : 'All rental features are hidden across the app'}
-                    </p>
-                  </div>
+
+                  <button
+                    onClick={handleRentalToggle}
+                    disabled={togglingRental}
+                    className="shrink-0 ml-4"
+                  >
+                    {togglingRental ? (
+                      <Loader2 size={16} className="animate-spin text-muted-foreground" />
+                    ) : (
+                      <div className={cn(
+                        'w-11 h-6 rounded-full transition-colors relative',
+                        rentalEnabled ? 'bg-foreground' : 'bg-muted border border-border'
+                      )}>
+                        <div className={cn(
+                          'absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform',
+                          rentalEnabled ? 'translate-x-5' : 'translate-x-0.5'
+                        )} />
+                      </div>
+                    )}
+                  </button>
                 </div>
 
-                <button
-                  onClick={handleRentalToggle}
-                  disabled={togglingRental}
-                  className="shrink-0 ml-4"
-                >
-                  {togglingRental ? (
-                    <Loader2 size={16} className="animate-spin text-muted-foreground" />
-                  ) : (
-                    <div className={cn(
-                      'w-11 h-6 rounded-full transition-colors relative',
-                      rentalEnabled ? 'bg-foreground' : 'bg-muted border border-border'
-                    )}>
-                      <div className={cn(
-                        'absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform',
-                        rentalEnabled ? 'translate-x-5' : 'translate-x-0.5'
-                      )} />
+                <div className="h-px bg-border" />
+
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center shrink-0">
+                      <Bell size={16} className="text-foreground" />
                     </div>
-                  )}
-                </button>
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Measurement Reminders</p>
+                      <p className="text-xs text-muted-foreground">
+                        {notificationEnabled
+                          ? 'Mobile PWA notifications are sent for due and overdue measurements'
+                          : 'No mobile notifications will be shown'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleNotificationToggle}
+                    disabled={togglingNotification}
+                    className="shrink-0 ml-4"
+                  >
+                    {togglingNotification ? (
+                      <Loader2 size={16} className="animate-spin text-muted-foreground" />
+                    ) : (
+                      <div className={cn(
+                        'w-11 h-6 rounded-full transition-colors relative',
+                        notificationEnabled ? 'bg-foreground' : 'bg-muted border border-border'
+                      )}>
+                        <div className={cn(
+                          'absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform',
+                          notificationEnabled ? 'translate-x-5' : 'translate-x-0.5'
+                        )} />
+                      </div>
+                    )}
+                  </button>
+                </div>
               </div>
             )}
           </div>

@@ -5,6 +5,7 @@ const pwa = withPWA({
   register: true,
   skipWaiting: true,
   disable: process.env.NODE_ENV === 'development',
+  importScripts: ['/notification-sw.js'],
   runtimeCaching: [
     {
       // Cache Firebase API calls so offline reads work
