@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowLeft, Download, CheckCircle, Loader2, Edit2, X, Plus, Trash2, Save } from 'lucide-react'
+import { ArrowLeft, Download, CheckCircle, Loader2, Edit2, X, Plus, Trash2, Save, Share2 } from 'lucide-react'
 import { doc, getDoc } from 'firebase/firestore'
 import { db } from '@/firebase/config'
 import { updateInvoice } from '@/firebase/firestore'
@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { formatCurrency, formatDate, toDate } from '@/lib/formatters'
 import { STATUS_COLORS } from '@/lib/constants'
 import { generateInvoicePDF } from '@/lib/pdf-utils'
+import { shareInvoice } from '@/lib/share-utils'
 import type { Invoice, InvoiceLineItem, InventoryItem } from '@/types'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
@@ -50,6 +51,7 @@ export default function InvoiceDetailPage() {
   const [markingPaid, setMarkingPaid] = useState(false)
   const [editMode, setEditMode] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [shareLoading, setShareLoading] = useState(false)
 
   const { name: shopName, tagline: shopTagline, phone: shopPhone, address: shopAddress, rentalEnabled } = useShopSettings()
 
@@ -186,6 +188,18 @@ export default function InvoiceDetailPage() {
       toast.error(err?.message || 'Failed to save invoice')
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleShare() {
+    if (!invoice) return
+    setShareLoading(true)
+    try {
+      await shareInvoice(invoice, { name: shopName, tagline: shopTagline, phone: shopPhone, address: shopAddress })
+    } catch (err: any) {
+      if (err?.name !== 'AbortError') toast.error('Could not share invoice')
+    } finally {
+      setShareLoading(false)
     }
   }
 
@@ -356,7 +370,7 @@ export default function InvoiceDetailPage() {
                     <div>
                       <label className="text-xs text-muted-foreground mb-2 block">Payment Method</label>
                       <div className="grid grid-cols-2 gap-1.5">
-                        {(['cash', 'upi', 'card', 'credit'] as const).map(m => (
+                        {(['cash', 'upi'] as const).map(m => (
                           <button
                             key={m}
                             onClick={() => setPaymentMethod(m)}
@@ -597,6 +611,16 @@ export default function InvoiceDetailPage() {
                   >
                     <Download size={15} />
                     Download PDF
+                  </motion.button>
+
+                  <motion.button
+                    whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+                    onClick={handleShare}
+                    disabled={shareLoading}
+                    className="flex items-center gap-2 px-5 py-2.5 border border-border rounded-xl text-sm font-medium hover:bg-muted transition-colors disabled:opacity-60"
+                  >
+                    {shareLoading ? <Loader2 size={15} className="animate-spin" /> : <Share2 size={15} />}
+                    Share
                   </motion.button>
 
                   <motion.button

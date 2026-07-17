@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
-import { Plus, Download, Search, Eye } from 'lucide-react'
+import { Plus, Download, Search, Eye, Share2, Loader2 } from 'lucide-react'
 import { orderBy } from 'firebase/firestore'
 import Header from '@/components/layout/Header'
 import { TableRowSkeleton } from '@/components/ui/skeleton'
@@ -12,6 +12,7 @@ import { useShopSettings } from '@/contexts/ShopSettingsContext'
 import { formatCurrency, formatDate, toDate } from '@/lib/formatters'
 import { STATUS_COLORS } from '@/lib/constants'
 import { generateInvoicePDF } from '@/lib/pdf-utils'
+import { shareInvoice } from '@/lib/share-utils'
 import { useDebounce } from '@/hooks/useDebounce'
 import type { Invoice, PaymentStatus } from '@/types'
 import { cn } from '@/lib/utils'
@@ -29,7 +30,19 @@ export default function BillingPage() {
   const { name: shopName, tagline: shopTagline, phone: shopPhone, address: shopAddress } = useShopSettings()
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [sharingId, setSharingId] = useState<string | null>(null)
   const debouncedSearch = useDebounce(search, 250)
+
+  async function handleShare(inv: Invoice) {
+    setSharingId(inv.id)
+    try {
+      await shareInvoice(inv, { name: shopName, tagline: shopTagline, phone: shopPhone, address: shopAddress })
+    } catch (err: any) {
+      // user cancelled the native share sheet — nothing to do
+    } finally {
+      setSharingId(null)
+    }
+  }
 
   const filtered = useMemo(() =>
     invoices.filter(inv => {
@@ -157,6 +170,13 @@ export default function BillingPage() {
                         </Link>
                         <button onClick={() => generateInvoicePDF(inv, { name: shopName, tagline: shopTagline, phone: shopPhone, address: shopAddress })} className="p-1.5 text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted transition-colors">
                           <Download size={14} />
+                        </button>
+                        <button
+                          onClick={() => handleShare(inv)}
+                          disabled={sharingId === inv.id}
+                          className="p-1.5 text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted transition-colors disabled:opacity-60"
+                        >
+                          {sharingId === inv.id ? <Loader2 size={14} className="animate-spin" /> : <Share2 size={14} />}
                         </button>
                       </div>
                     </td>

@@ -27,10 +27,10 @@ function safeDate(val: any): string {
   return new Date().toISOString()
 }
 
-export async function generateInvoicePDF(
+export async function buildInvoicePDF(
   invoice: Invoice,
   shop: ShopInfo = { name: SHOP_NAME, tagline: SHOP_TAGLINE }
-): Promise<void> {
+): Promise<any> {
   const jspdf = await import('jspdf')
   const jsPDF = (jspdf as any).default?.jsPDF || (jspdf as any).jsPDF
   const autoTableMod = await import('jspdf-autotable')
@@ -211,5 +211,21 @@ export async function generateInvoicePDF(
   doc.text(shop.phone ? `${shop.name}  ·  ${shop.phone}` : shop.name, margin, footerY)
   doc.text('Thank you for your business.', contentR, footerY, { align: 'right' })
 
+  return doc
+}
+
+export async function generateInvoicePDF(
+  invoice: Invoice,
+  shop: ShopInfo = { name: SHOP_NAME, tagline: SHOP_TAGLINE }
+): Promise<void> {
+  const doc = await buildInvoicePDF(invoice, shop)
   doc.save(`${invoice.invoiceNumber}.pdf`)
+}
+
+export async function getInvoicePDFBlob(
+  invoice: Invoice,
+  shop: ShopInfo = { name: SHOP_NAME, tagline: SHOP_TAGLINE }
+): Promise<Blob> {
+  const doc = await buildInvoicePDF(invoice, shop)
+  return doc.output('blob')
 }

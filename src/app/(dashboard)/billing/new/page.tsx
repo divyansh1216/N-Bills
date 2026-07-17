@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Trash2, ArrowLeft, Loader2, FileText, Ruler } from 'lucide-react'
+import { Plus, Trash2, ArrowLeft, Loader2, FileText, Ruler, Share2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { getDocs, collection, query, where } from 'firebase/firestore'
 import { db } from '@/firebase/config'
@@ -12,6 +12,7 @@ import { useShopSettings } from '@/contexts/ShopSettingsContext'
 import Header from '@/components/layout/Header'
 import { formatCurrency, generateInvoiceNumber } from '@/lib/formatters'
 import { generateInvoicePDF } from '@/lib/pdf-utils'
+import { shareInvoice } from '@/lib/share-utils'
 import { useFirestoreCollection } from '@/hooks/useFirestoreCollection'
 import LoadMeasurementsModal from '@/components/measurements/LoadMeasurementsModal'
 import AddItemModal from '@/components/inventory/AddItemModal'
@@ -47,9 +48,10 @@ function NewInvoicePageInner() {
   const [amountPaid, setAmountPaid] = useState(0)
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'upi' | 'card' | 'credit'>('cash')
   const [notes, setNotes] = useState('')
-  const [status, setStatus] = useState<'paid' | 'pending' | 'partial'>('paid')
+  const [status, setStatus] = useState<Invoice['status']>('pending')
   const [loading, setLoading] = useState(false)
   const [pdfLoading, setPdfLoading] = useState(false)
+  const [shareLoading, setShareLoading] = useState(false)
   const [measurementsModalOpen, setMeasurementsModalOpen] = useState(false)
   const [addItemModalOpen, setAddItemModalOpen] = useState(false)
   const [addItemTargetLineId, setAddItemTargetLineId] = useState<string | null>(null)
@@ -119,7 +121,7 @@ function NewInvoicePageInner() {
 
   function handleAmountPaidChange(value: number) {
     setAmountPaid(value)
-    if (value <= 0) setStatus('pending')
+    if (value <= 0) setStatus(s => (s === 'partial' ? 'pending' : s))
     else if (value >= total) setStatus('paid')
     else setStatus('partial')
   }
@@ -137,7 +139,7 @@ function NewInvoicePageInner() {
     return l.type === 'rental' ? { ...base, rentalDays: l.rentalDays } : base
   })
 
-  async function handleSave(generatePDF = false) {
+  async function handleSave(action: 'none' | 'pdf' | 'share' = 'none') {
     if (!customerId) { toast.error('Select a customer'); return }
     if (lineItems.some(l => !l.name)) { toast.error('Fill in all line items'); return }
     if (!selectedCustomer) return
@@ -190,11 +192,20 @@ function NewInvoicePageInner() {
       })
 
       const finalInvoice: Invoice = { ...invoice, id: ref.id }
+      const shop = { name: shopName, tagline: shopTagline, phone: shopPhone, address: shopAddress }
 
-      if (generatePDF) {
+      if (action === 'pdf') {
         setPdfLoading(true)
-        await generateInvoicePDF(finalInvoice, { name: shopName, tagline: shopTagline, phone: shopPhone, address: shopAddress })
+        await generateInvoicePDF(finalInvoice, shop)
         setPdfLoading(false)
+      } else if (action === 'share') {
+        setShareLoading(true)
+        try {
+          await shareInvoice(finalInvoice, shop)
+        } catch (shareErr: any) {
+          if (shareErr?.name !== 'AbortError') toast.error('Could not share invoice')
+        }
+        setShareLoading(false)
       }
 
       toast.success('Invoice created successfully!')
@@ -417,7 +428,7 @@ function NewInvoicePageInner() {
               <div>
                 <label className="text-xs text-muted-foreground mb-2 block">Payment Method</label>
                 <div className="grid grid-cols-2 gap-1.5">
-                  {(['cash', 'upi', 'card', 'credit'] as const).map(method => (
+                  {(['cash', 'upi'] as const).map(method => (
                     <button
                       key={method}
                       onClick={() => setPaymentMethod(method)}
@@ -460,9 +471,28 @@ function NewInvoicePageInner() {
                   placeholder="0"
                   className={cn(inputClass, 'w-full')}
                 />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Status: <span className="font-medium capitalize text-foreground">{status}</span>
-                </p>
+              </div>
+
+              {/* Status */}
+              <div>
+                <label className="text-xs text-muted-foreground mb-2 block">Status</label>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {(['pending', 'paid', 'partial', 'overdue'] as const).map(s => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setStatus(s)}
+                      className={cn(
+                        'py-2 rounded-xl text-xs font-medium capitalize transition-colors border',
+                        status === s
+                          ? 'bg-foreground text-background border-foreground'
+                          : 'bg-background border-border text-muted-foreground hover:text-foreground'
+                      )}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div className="h-px bg-border" />
@@ -502,7 +532,7 @@ function NewInvoicePageInner() {
                 <motion.button
                   whileHover={{ scale: 1.01 }}
                   whileTap={{ scale: 0.98 }}
-                  onClick={() => handleSave(false)}
+                  onClick={() => handleSave('none')}
                   disabled={loading}
                   className="w-full py-3 bg-primary text-primary-foreground rounded-xl text-sm font-medium flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-60"
                 >
@@ -512,7 +542,17 @@ function NewInvoicePageInner() {
                 <motion.button
                   whileHover={{ scale: 1.01 }}
                   whileTap={{ scale: 0.98 }}
-                  onClick={() => handleSave(true)}
+                  onClick={() => handleSave('share')}
+                  disabled={loading || shareLoading}
+                  className="w-full py-3 border border-border rounded-xl text-sm font-medium flex items-center justify-center gap-2 hover:bg-muted transition-colors disabled:opacity-60"
+                >
+                  {shareLoading ? <Loader2 size={15} className="animate-spin" /> : <Share2 size={15} />}
+                  Save & Share
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => handleSave('pdf')}
                   disabled={loading || pdfLoading}
                   className="w-full py-3 border border-border rounded-xl text-sm font-medium flex items-center justify-center gap-2 hover:bg-muted transition-colors disabled:opacity-60"
                 >
