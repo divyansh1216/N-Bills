@@ -1,56 +1,35 @@
-import withPWA from 'next-pwa'
-
-const pwa = withPWA({
-  dest: 'public',
-  register: true,
-  skipWaiting: true,
-  disable: process.env.NODE_ENV === 'development',
-  importScripts: ['/notification-sw.js'],
-  runtimeCaching: [
-    {
-      // Cache Firebase API calls so offline reads work
-      urlPattern: /^https:\/\/firestore\.googleapis\.com\/.*/i,
-      handler: 'NetworkFirst',
-      options: {
-        cacheName: 'firestore-cache',
-        networkTimeoutSeconds: 10,
-        expiration: { maxEntries: 200, maxAgeSeconds: 7 * 24 * 60 * 60 },
-        cacheableResponse: { statuses: [0, 200] },
-      },
-    },
-    {
-      // Cache all Next.js static assets
-      urlPattern: /^https:\/\/fonts\.(?:gstatic|googleapis)\.com\/.*/i,
-      handler: 'CacheFirst',
-      options: {
-        cacheName: 'google-fonts',
-        expiration: { maxEntries: 20, maxAgeSeconds: 365 * 24 * 60 * 60 },
-        cacheableResponse: { statuses: [0, 200] },
-      },
-    },
-    {
-      // Cache app pages and API routes
-      urlPattern: /\/_next\/static\/.*/i,
-      handler: 'CacheFirst',
-      options: {
-        cacheName: 'next-static',
-        expiration: { maxEntries: 200, maxAgeSeconds: 30 * 24 * 60 * 60 },
-      },
-    },
-  ],
-})
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
     unoptimized: true,
-    remotePatterns: [
+    remotePatterns: [{ protocol: 'https', hostname: 'res.cloudinary.com' }],
+  },
+  async headers() {
+    return [
       {
-        protocol: 'https',
-        hostname: 'res.cloudinary.com',
+        source: '/sw.js',
+        headers: [
+          { key: 'Content-Type', value: 'application/javascript; charset=utf-8' },
+          { key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' },
+          { key: 'Service-Worker-Allowed', value: '/' },
+        ],
       },
-    ],
+      ...['/manifest.webmanifest', '/manifest.json'].map(source => ({
+        source,
+        headers: [
+          { key: 'Content-Type', value: 'application/manifest+json' },
+          { key: 'Cache-Control', value: 'no-cache' },
+        ],
+      })),
+      {
+        source: '/.well-known/assetlinks.json',
+        headers: [
+          { key: 'Content-Type', value: 'application/json' },
+          { key: 'Cache-Control', value: 'public, max-age=300' },
+        ],
+      },
+    ]
   },
 }
 
-export default pwa(nextConfig)
+export default nextConfig

@@ -5,6 +5,7 @@ import { Toaster } from 'sonner'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { ShopSettingsProvider } from '@/contexts/ShopSettingsContext'
 import MeasurementDueNotifications from '@/components/notifications/MeasurementDueNotifications'
+import ServiceWorkerRegistration from '@/components/pwa/ServiceWorkerRegistration'
 import './globals.css'
 
 const geistSans = localFont({
@@ -21,7 +22,7 @@ const geistMono = localFont({
 export const metadata: Metadata = {
   title: 'N-Bills',
   description: 'Luxury boutique billing and management',
-  manifest: '/manifest.json',
+  manifest: '/manifest.webmanifest',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
@@ -40,6 +41,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased`}>
+        <ServiceWorkerRegistration />
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
           <ShopSettingsProvider>
             <AuthProvider>
